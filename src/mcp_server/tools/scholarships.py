@@ -43,7 +43,7 @@ def _fetch_active_scholarships(
     if country:
         query = query.ilike("country", country.strip())
     if study_level:
-        query = query.ilike("study_level", study_level.strip())
+        query = query.eq("study_level", study_level.strip().lower())
     if funding_type:
         query = query.ilike("funding_type", funding_type.strip())
     if university:
@@ -157,11 +157,11 @@ def register_tools(mcp: FastMCP):
         Args:
             nationality: Student's nationality, e.g. "nepalese", "indian", "chinese".
             destination_country: Country where the scholarship is offered, e.g. "australia", "uk".
-            study_level: One of: foundation, undergraduate, postgraduate, doctorate, vocational.
+            study_level: One of: "doctorate", "postgraduate", "undergraduate", "foundation", "vocational".
             subject: Subject area to match (fuzzy), e.g. "computer science", "engineering".
             min_value_aud: Minimum scholarship value in AUD. Only returns awards >= this amount.
             deadline_after: ISO date string (YYYY-MM-DD). Only returns scholarships with deadlines after this date.
-            funding_type: One of: full, partial, fee_waiver, stipend, accommodation.
+            funding_type: One of: "full", "partial", "fee_waiver", "stipend", "accommodation".
         """
         try:
             log.info("tool_call", tool="search_scholarships", parameters={
