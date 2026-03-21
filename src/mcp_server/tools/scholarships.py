@@ -95,6 +95,16 @@ def _scholarship_summary(s: dict[str, Any]) -> dict[str, Any]:
         except (ValueError, TypeError):
             pass
 
+    # Source Platform Mapping
+    source = s.get("source")
+    platform = "Global Scholarship"
+    if source == 'idp':
+        platform = "IDP Education"
+    elif source in ('australia_awards', 'rtp', 'state_govt'):
+        platform = "Australian Government"
+    elif source == 'university_direct':
+        platform = "University Direct"
+
     return {
         "id": s.get("id"),
         "title": s.get("title"),
@@ -114,7 +124,9 @@ def _scholarship_summary(s: dict[str, Any]) -> dict[str, Any]:
         "eligibility": s.get("eligibility"),
         "description": s.get("description"),
         "apply_url": s.get("apply_url"),
+        "direct_apply_url": s.get("apply_url"),
         "source": s.get("source"),
+        "source_platform": platform,
         "source_url": s.get("source_url"),
     }
 
@@ -251,10 +263,18 @@ def register_tools(mcp: FastMCP):
                 results.append(item)
 
             log.info("tool_result", tool="search_scholarships", result_count=len(results))
+            
+            # Calculate country distribution for the result set
+            country_dist: dict[str, int] = defaultdict(int)
+            for s in rows:
+                c = s.get("country") or "other"
+                country_dist[c] += 1
+
             return {
                 "results": results,
                 "total_count": len(scored),
                 "showing": len(results),
+                "country_breakdown": dict(country_dist),
                 "filters_applied": {
                     "nationality": nationality,
                     "destination_country": destination_country,
@@ -398,6 +418,11 @@ def register_tools(mcp: FastMCP):
                             reasons.append(f"⚠️ Deadline in {days_left} days — fast-track your application!")
                     except (ValueError, TypeError):
                         pass
+
+                # 8. Source preference boost (IDP preference)
+                if s.get("source") == "idp":
+                    match_score += 0.1
+                    reasons.append("High-quality data verified source: IDP Education.")
 
                 # NEW LIKELIHOOD RULES
                 likelihood = "low"
