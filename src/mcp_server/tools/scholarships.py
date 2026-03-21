@@ -321,77 +321,100 @@ def register_tools(mcp: FastMCP):
                     "Try a different destination country."
                 )
 
-            scored: list[tuple[float, dict, list[str]]] = []
+            scored: list[tuple[float, dict, list[str], str]] = []
             for s in rows:
                 match_score = 0.0
                 reasons: list[str] = []
-
-                # Study level match
-                if inferred_level and s.get("study_level"):
-                    if s["study_level"].lower() == inferred_level:
-                        match_score += 0.25
-                        reasons.append(f"Study level matches ({s['study_level']})")
+                
+                # 1. Study level match (Fundamental)
+                s_level = (s.get("study_level") or "").lower()
+                if inferred_level and s_level:
+                    if s_level == inferred_level:
+                        match_score += 0.3
+                        reasons.append(f"Your {current_qualification} qualification makes you eligible for {s_level} scholarships.")
                     else:
-                        continue  # Wrong level, skip
+                        continue  # Skip wrong level
 
-                # Subject match
+                # 2. Country match (Included in _fetch_active_scholarships filter, but reward it)
+                if s.get("country") and target_country.lower() == s["country"].lower():
+                    match_score += 0.1
+
+                # 3. Subject match (Relevance)
                 subj_score = max(
                     _fuzzy_score(target_subject, s.get("subject") or ""),
                     _fuzzy_score(target_subject, s.get("subject_category") or ""),
                     _fuzzy_score(target_subject, s.get("description") or ""),
                 )
                 if subj_score > 0.3:
-                    match_score += subj_score * 0.25
-                    reasons.append(f"Subject relevance: {subj_score:.0%}")
+                    match_score += subj_score * 0.2
+                    reasons.append(f"Strong match for your interest in {target_subject} ({subj_score:.0%})")
 
-                # Nationality eligibility
+                # 4. Nationality & International Status
                 elig = (s.get("eligibility") or "").lower()
+                is_all_international = "all international" in elig or "international students" in elig or not elig
+                
                 if nationality.lower() in elig:
+                    match_score += 0.3
+                    reasons.append(f"This award explicitly targets students from {nationality.title()}.")
+                elif is_all_international:
+                    match_score += 0.15
+                    reasons.append("Open to all international students regardless of nationality.")
+                elif elig and nationality.lower() not in elig:
+                    match_score -= 0.2
+                    reasons.append("Check specific nationality restrictions in eligibility notes.")
+
+                # 5. Funding Type & Value
+                f_type = (s.get("funding_type") or "").lower()
+                if f_type == "full":
                     match_score += 0.2
-                    reasons.append(f"Explicitly mentions {nationality} students")
-                elif "all international" in elig:
+                    reasons.append("This scholarship covers full tuition - matches your need for complete funding.")
+                elif f_type == "partial":
                     match_score += 0.1
-                    reasons.append("Open to all international students")
-                elif elig and nationality.lower() not in elig and "all" not in elig:
-                    # Nationality is specifically excluded
-                    match_score -= 0.3
-                    reasons.append("May have nationality restrictions — check eligibility")
+                    reasons.append("Provides partial funding to reduce your overall tuition burden.")
 
-                # Funding type bonus
-                if s.get("funding_type") == "full":
+                award_val = s.get("award_value_max") or s.get("award_value_min") or 0
+                if award_val > 10000:
                     match_score += 0.1
-                    reasons.append("Fully funded scholarship")
-                elif s.get("funding_type") == "partial":
-                    match_score += 0.05
-                    reasons.append("Partial funding")
+                    reasons.append(f"High-value award ({s.get('award_currency', 'AUD')} {award_val:,.0f}) significantly offsets costs.")
 
-                # Deadline check (still open?)
+                # 6. IELTS & Academic Merit
+                if ielts_score > 6.5:
+                    match_score += 0.1
+                    reasons.append(f"Your strong IELTS score of {ielts_score} meets or exceeds requirements.")
+                
+                if gpa is not None and gpa >= 3.5:
+                    if any(k in elig for k in ("academic", "merit", "excellence", "gpa")):
+                        match_score += 0.15
+                        reasons.append(f"Your high GPA of {gpa} makes you a top candidate for this merit-based award.")
+
+                # 7. Deadline Check
                 if s.get("deadline"):
                     try:
-                        dl = datetime.fromisoformat(str(s["deadline"])).date()
+                        dl = s["deadline"] if isinstance(s["deadline"], date) else datetime.fromisoformat(str(s["deadline"])).date()
                         if dl < date.today():
-                            continue  # Expired
+                            continue # Expired
                         days_left = (dl - date.today()).days
                         if days_left < 30:
-                            reasons.append(f"⚠️ Deadline in {days_left} days — apply soon!")
+                            reasons.append(f"⚠️ Deadline in {days_left} days — fast-track your application!")
                     except (ValueError, TypeError):
                         pass
 
-                # Academic merit indicators
-                if gpa is not None and gpa >= 3.5:
-                    if "academic" in elig or "merit" in elig or "excellence" in elig:
-                        match_score += 0.1
-                        reasons.append("GPA qualifies for merit-based criteria")
-
+                # NEW LIKELIHOOD RULES
+                likelihood = "low"
+                
+                # Rule HIGH: Full funding + matching level + matching country
+                # OR No nationality restriction + IELTS > 6.5
+                if (f_type == "full" and s_level == inferred_level and match_score > 0.5) or (is_all_international and ielts_score > 6.5 and match_score > 0.6):
+                    likelihood = "high"
+                    match_score = max(match_score, 0.75)
+                # Rule MEDIUM: Country match + Level match (Base)
+                # OR Funding type match + value > 10000
+                elif (s_level == inferred_level and match_score > 0.4) or (award_val > 10000 and match_score > 0.4):
+                    likelihood = "medium"
+                    match_score = max(match_score, 0.45)
+                
                 if match_score <= 0:
                     continue
-
-                # Estimate likelihood
-                likelihood = "low"
-                if match_score >= 0.7:
-                    likelihood = "high"
-                elif match_score >= 0.4:
-                    likelihood = "medium"
 
                 final_mscore = float(min(match_score, 1.0))
                 scored.append((round(final_mscore, 3), s, reasons, likelihood))
