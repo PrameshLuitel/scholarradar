@@ -224,19 +224,20 @@ def register_tools(mcp: FastMCP):
             except Exception:
                 profile["active_scholarships_count"] = None
 
-            # Enrich with course count
+            # Enrich with top 5 scholarships
             try:
-                course_resp = (
-                    db.table("courses")
-                    .select("id", count="exact")
+                top_scholarships_resp = (
+                    db.table("scholarships")
+                    .select("title, funding_type, award_value_max, deadline, award_currency")
                     .ilike("university", f"%{u['name']}%")
                     .eq("is_active", True)
-                    .limit(0)
+                    .order("deadline", nullsfirst=False)
+                    .limit(5)
                     .execute()
                 )
-                profile["active_courses_count"] = course_resp.count or 0
+                profile["top_scholarships"] = top_scholarships_resp.data or []
             except Exception:
-                profile["active_courses_count"] = None
+                profile["top_scholarships"] = []
 
             log.info("tool_result", tool="get_university_profile", university=u["name"])
             return {"profile": profile}

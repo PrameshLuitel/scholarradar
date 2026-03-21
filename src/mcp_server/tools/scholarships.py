@@ -579,41 +579,74 @@ def register_tools(mcp: FastMCP):
     @mcp.tool()
     async def get_by_university(
         university_name: str,
+        limit: int = 20,
+        study_level: Optional[str] = None,
+        funding_type: Optional[str] = None,
     ) -> dict[str, Any]:
-        """Get all active scholarships offered by a specific university.
+        """Get scholarships offered by a specific university.
 
-        Uses fuzzy matching on the university name so partial names work
-        (e.g. "Melbourne" will match "University of Melbourne").
+        Returns top scholarships sorted by deadline and value.
+        Use limit parameter to control result count (default 20, max 50).
 
         Args:
-            university_name: Full or partial university name, e.g. "University of Sydney", "ANU".
+            university_name: Full or partial university name, e.g. "Melbourne", "ANU".
+            limit: Number of results to return (max 50).
+            study_level: Optional level filter: foundation, undergraduate, postgraduate, doctorate.
+            funding_type: Optional: full, partial, fee_waiver, stipend, accommodation.
         """
         try:
+            safe_limit = min(max(1, limit), 50)
             log.info("tool_call", tool="get_by_university", parameters={
-                "university_name": university_name,
+                "university_name": university_name, "limit": safe_limit,
+                "study_level": study_level, "funding_type": funding_type,
             })
 
-            rows = _fetch_active_scholarships(university=university_name)
+            db = _get_db()
+            query = db.table("scholarships").select("*").eq("is_active", True).ilike("university", f"%{university_name}%")
+            
+            if study_level:
+                query = query.ilike("study_level", study_level.strip())
+            if funding_type:
+                query = query.ilike("funding_type", funding_type.strip())
+            
+            # Order by deadline (nearest first) and then value
+            response = query.order("deadline", nullsfirst=False).order("award_value_max", desc=True).execute()
+            rows: list[dict[str, Any]] = response.data or []
 
             if not rows:
-                return _empty_result(
-                    f"No active scholarships found for '{university_name}'. "
-                    "Try a different spelling or the university's full name."
-                )
+                return _empty_result(f"No active scholarships found for '{university_name}'.")
 
-            results = [_scholarship_summary(s) for s in rows]
-            # Sort by value descending
-            results.sort(key=lambda x: x.get("award_value_max") or 0, reverse=True)
+            total_found = len(rows)
+            results = [_scholarship_summary(s) for s in rows[:safe_limit]]
 
-            # Summary of unique values
-            universities_found = list({r["university"] for r in results})
+            # Calculate summary stats
+            fully_funded_count = sum(1 for s in rows if s.get("funding_type") == "full")
+            max_val = max((s.get("award_value_max") or 0 for s in rows), default=0)
+            
+            next_deadline = None
+            deadlines = [s["deadline"] for s in rows if s.get("deadline")]
+            if deadlines:
+                try:
+                    parsed_deadlines = []
+                    for d in deadlines:
+                        if isinstance(d, date):
+                            parsed_deadlines.append(d)
+                        else:
+                            parsed_deadlines.append(datetime.fromisoformat(str(d)).date())
+                    next_deadline = str(min(parsed_deadlines))
+                except (ValueError, TypeError):
+                    pass
 
-            log.info("tool_result", tool="get_by_university", result_count=len(results))
             return {
-                "results": results,
-                "total_count": len(results),
-                "universities_matched": universities_found,
-                "university_query": university_name,
+                "university": university_name,
+                "total_matches": total_found,
+                "showing": len(results),
+                "scholarships": results,
+                "summary": {
+                    "fully_funded": fully_funded_count,
+                    "highest_value_aud": max_val,
+                    "next_deadline": next_deadline,
+                }
             }
 
         except Exception as e:
