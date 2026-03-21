@@ -12,23 +12,24 @@ logger = structlog.get_logger("mcp_server.analytics")
 def _do_log(tool_name: str, params: Dict[str, Any], results_count: int, response_time: int):
     try:
         db = get_db()
-        db.table("search_analytics").insert({
+        db.table("tool_call_logs").insert({
             "tool_name": tool_name,
             "nationality": params.get("nationality"),
             "destination_country": params.get("destination_country"),
             "study_level": params.get("study_level"),
             "subject": params.get("subject"),
-            "funding_type": params.get("funding_type"),
             "min_value_aud": params.get("min_value_aud"),
             "ielts_score": params.get("ielts_score"),
             "gpa": params.get("gpa"),
-            "results_returned": results_count,
+            "funding_type": params.get("funding_type"),
+            "university_name": params.get("university_name"),
+            "deadline_after": params.get("deadline_after"),
+            "results_count": results_count,
             "zero_results": results_count == 0,
-            "session_id": str(uuid.uuid4())[:8],
             "response_time_ms": int(response_time)
         }).execute()
     except Exception as e:
-        logger.error("search_analytics_failed", tool=tool_name, error=str(e))
+        logger.error("tool_call_logs_failed", tool=tool_name, error=str(e))
 
 
 def extract_results_count(result: Any) -> int:
