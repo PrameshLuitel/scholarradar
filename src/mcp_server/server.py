@@ -10,7 +10,7 @@ ScholarRadar MCP Server — production-grade server with:
 - Auto-registers all tools from src/mcp_server/tools/
 
 Run:
-    uvicorn src.mcp_server.server:app --host 0.0.0.0 --port 8000
+    uvicorn src.mcp_server.server:app --host 0.0.0.0 --port 10000
 """
 
 from __future__ import annotations
@@ -306,7 +306,7 @@ app = Starlette(
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.getenv("MCP_PORT", "8000"))
+    port = int(os.getenv("PORT", 10000))
     log.info("starting_uvicorn", port=port)
     uvicorn.run(
         "src.mcp_server.server:app",
