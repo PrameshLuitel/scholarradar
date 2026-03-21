@@ -30,6 +30,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
+from starlette.middleware.cors import CORSMiddleware
 
 from mcp.server.fastmcp import FastMCP
 
@@ -94,8 +95,8 @@ class APIKeyAuthMiddleware(BaseHTTPMiddleware):
     """Checks X-API-Key header on every request except /health."""
 
     async def dispatch(self, request: Request, call_next):
-        # Allow health checks without auth
-        if request.url.path == "/health":
+        # Allow health checks and CORS preflights without auth
+        if request.url.path == "/health" or request.method == "OPTIONS":
             return await call_next(request)
 
         api_keys = _get_api_keys()
@@ -119,7 +120,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """Enforces per-API-key rate limiting."""
 
     async def dispatch(self, request: Request, call_next):
-        if request.url.path == "/health":
+        if request.url.path == "/health" or request.method == "OPTIONS":
             return await call_next(request)
 
         api_key = request.headers.get("X-API-Key", "_anonymous")
@@ -282,9 +283,16 @@ async def app_lifespan(app: Starlette):
 app = Starlette(
     routes=[
         Route("/health", health_check, methods=["GET"]),
+        Mount("/mcp", app=mcp.streamable_http_app()),
         Mount("/", app=mcp.streamable_http_app()),
     ],
     middleware=[
+        Middleware(
+            CORSMiddleware,
+            allow_origins=["https://claude.ai"],
+            allow_methods=["*"],
+            allow_headers=["*"],
+        ),
         Middleware(RequestLoggingMiddleware),
         Middleware(APIKeyAuthMiddleware),
         Middleware(RateLimitMiddleware),
