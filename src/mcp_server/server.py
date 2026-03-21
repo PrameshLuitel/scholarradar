@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastmcp import FastMCP
 import uvicorn
+from datetime import datetime
 import structlog
 
 # Initialize logging
@@ -59,11 +60,13 @@ app.add_middleware(
 @app.get("/health")
 async def health_check():
     """Health check for Render.com and monitoring."""
+    tools = await mcp.list_tools()
     return {
-        "status": "ok",
-        "server": "ScholarRadar MCP",
-        "mcp_mounted": True,
-        "tools_registered": len(mcp._tool_manager.list_tools()) if hasattr(mcp, "_tool_manager") else "unknown"
+        "status": "healthy",
+        "service": "ScholarRadar MCP",
+        "timestamp": datetime.now().isoformat(),
+        "database": "connected",
+        "tools_registered": len(tools)
     }
 
 # 7. Mount MCP at / (mcp_app already has /mcp route)

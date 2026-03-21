@@ -5,7 +5,7 @@ destination comparisons, total cost calculations, and affordable city finding.
 from __future__ import annotations
 from typing import Any, Optional
 import structlog
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 log = structlog.get_logger("mcp_server.tools.cost_of_living")
 

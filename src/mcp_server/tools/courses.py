@@ -13,7 +13,7 @@ from difflib import SequenceMatcher
 from typing import Any, Optional
 
 import structlog
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 log = structlog.get_logger("mcp_server.tools.courses")
 

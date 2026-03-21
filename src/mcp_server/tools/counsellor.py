@@ -17,7 +17,7 @@ from difflib import SequenceMatcher
 from typing import Any, Optional
 
 import structlog
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 log = structlog.get_logger("mcp_server.tools.counsellor")
 
@@ -164,7 +164,7 @@ def register_tools(mcp: FastMCP):
         nationality: str,
         current_qualification: str,
         target_subject: str,
-        preferred_countries: list[str],
+        preferred_countries: str,
         total_budget_usd: float,
         timeline_months: int,
         ielts_score: Optional[float] = None,
@@ -188,24 +188,27 @@ def register_tools(mcp: FastMCP):
             nationality: Your nationality, e.g. "nepalese", "indian", "bangladeshi".
             current_qualification: Your current degree and GPA, e.g. "Bachelor of Engineering, GPA 3.7".
             target_subject: What you want to study, e.g. "Computer Science", "Data Science", "MBA".
-            preferred_countries: List of countries to consider, e.g. ["australia", "uk", "canada"].
+            preferred_countries: Comma-separated list of countries, e.g. "australia, uk, canada".
             total_budget_usd: Total budget in USD for the entire study period.
             timeline_months: How many months until you want to start, e.g. 6 for next semester.
             ielts_score: Your IELTS overall band score if you have one (e.g. 6.5). Leave empty if not yet taken.
-            career_goal: What career you want after graduating, e.g. "data engineer at a tech company". Helps match courses.
+            career_goal: What career you want after graduating, e.g. "data engineer at a tech company".
         """
         started = time.time()
         try:
+            # Parse comma-separated string into list
+            countries_list = [c.strip().lower() for c in preferred_countries.split(",") if c.strip()]
+
             log.info("tool_call", tool="plan_study_abroad_journey", parameters={
                 "nationality": nationality, "target_subject": target_subject,
-                "preferred_countries": preferred_countries,
+                "preferred_countries": countries_list,
                 "budget_usd": total_budget_usd, "timeline_months": timeline_months,
             })
 
             # ── Check cache ──
             cache_params = {
                 "nationality": nationality, "qualification": current_qualification,
-                "subject": target_subject, "countries": preferred_countries,
+                "subject": target_subject, "countries": countries_list,
                 "budget": total_budget_usd, "timeline": timeline_months,
                 "ielts": ielts_score, "career": career_goal,
             }
@@ -230,7 +233,7 @@ def register_tools(mcp: FastMCP):
             all_courses: list[dict] = []
             course_warnings: list[str] = []
 
-            for country in preferred_countries:
+            for country in countries_list:
                 query = db.table("courses").select("*").eq("is_active", True).ilike("country", country.strip())
                 if inferred_level:
                     query = query.ilike("level", inferred_level)
@@ -290,7 +293,7 @@ def register_tools(mcp: FastMCP):
             all_scholarships: list[dict] = []
             schol_warnings: list[str] = []
 
-            for country in preferred_countries:
+            for country in countries_list:
                 query = db.table("scholarships").select("*").eq("is_active", True).ilike("country", country.strip())
                 if inferred_level:
                     query = query.ilike("study_level", inferred_level)
@@ -442,7 +445,7 @@ def register_tools(mcp: FastMCP):
             # ════════════════════════════════════════════════════════════
             visa_assessments: list[dict] = []
 
-            for country in preferred_countries:
+            for country in countries_list:
                 visa_rows = (db.table("visa_requirements").select("*")
                     .ilike("nationality", nationality.strip())
                     .ilike("destination_country", country.strip())

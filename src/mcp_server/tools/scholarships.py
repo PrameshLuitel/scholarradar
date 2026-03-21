@@ -15,7 +15,7 @@ from difflib import SequenceMatcher
 from typing import Any, Optional
 
 import structlog
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 log = structlog.get_logger("mcp_server.tools.scholarships")
 
@@ -829,3 +829,66 @@ def register_tools(mcp: FastMCP):
         except Exception as e:
             log.error("tool_error", tool="get_scholarship_statistics", error=str(e))
             return {"error": "Failed to generate statistics.", "error_type": "tool_error"}
+    # ────────────────────────────────────────────────────────────────────
+    # 8. get_scholarships_by_value
+    # ────────────────────────────────────────────────────────────────────
+
+    @mcp.tool()
+    async def get_scholarships_by_value(
+        min_value_aud: float,
+        destination_country: Optional[str] = None,
+        nationality: str = "nepalese",
+    ) -> dict[str, Any]:
+        """Find scholarships above a specified minimum dollar value.
+
+        Use when the student specifies a minimum funding amount needed
+        to cover their study costs.
+
+        Args:
+            min_value_aud: Minimum scholarship value in AUD.
+            destination_country: Optional country filter, e.g. "australia", "uk".
+            nationality: Student's nationality for eligibility check.
+        """
+        try:
+            log.info("tool_call", tool="get_scholarships_by_value", parameters={
+                "min_value_aud": min_value_aud, "destination_country": destination_country,
+                "nationality": nationality,
+            })
+
+            rows = _fetch_active_scholarships(country=destination_country)
+            if not rows:
+                return _empty_result(f"No scholarships found in {destination_country or 'any country'}.")
+
+            matches: list[dict[str, Any]] = []
+            for s in rows:
+                val = float(s.get("award_value_max") or s.get("award_value_min") or 0)
+                if val >= min_value_aud:
+                    item = _scholarship_summary(s)
+                    # Check eligibility
+                    elig = (s.get("eligibility") or "").lower()
+                    if nationality.lower() in elig or "all international" in elig or not elig:
+                        item["eligibility_status"] = "likely_eligible"
+                    else:
+                        item["eligibility_status"] = "check_requirements"
+                    matches.append(item)
+
+            matches.sort(key=lambda x: x.get("award_value_max") or 0, reverse=True)
+
+            if not matches:
+                return _empty_result(
+                    f"No scholarships found with value >= {min_value_aud} AUD"
+                    + (f" in {destination_country}" if destination_country else "")
+                    + "."
+                )
+
+            log.info("tool_result", tool="get_scholarships_by_value", result_count=len(matches))
+            return {
+                "results": matches,
+                "total_count": len(matches),
+                "min_value_aud": min_value_aud,
+                "destination_country": destination_country,
+            }
+
+        except Exception as e:
+            log.error("tool_error", tool="get_scholarships_by_value", error=str(e))
+            return {"error": "Failed to fetch scholarships by value.", "error_type": "tool_error"}

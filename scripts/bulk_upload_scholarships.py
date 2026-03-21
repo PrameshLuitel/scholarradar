@@ -99,7 +99,7 @@ def upload_file(filename):
             try:
                 supabase.table("scholarships").upsert(
                     cleaned_batch, 
-                    on_conflict="title,university"
+                    on_conflict="title,university,country,study_level,subject"
                 ).execute()
                 print(f"Progress: Upserted {i + len(cleaned_batch)} / {total_records} records.")
                 break
