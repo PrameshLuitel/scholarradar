@@ -99,18 +99,12 @@ class APIKeyAuthMiddleware(BaseHTTPMiddleware):
         if request.url.path == "/health" or request.method == "OPTIONS":
             return await call_next(request)
 
-        api_keys = _get_api_keys()
-        # If no keys configured, skip auth (dev mode)
-        if not api_keys:
+    async def dispatch(self, request: Request, call_next):
+        # Allow health checks and CORS preflights without auth
+        if request.url.path == "/health" or request.method == "OPTIONS":
             return await call_next(request)
 
-        provided_key = request.headers.get("X-API-Key", "")
-        if provided_key not in api_keys:
-            log.warning("auth_rejected", path=request.url.path, reason="invalid_api_key")
-            return JSONResponse(
-                {"error": "Invalid or missing API key", "error_type": "authentication_error"},
-                status_code=401,
-            )
+        # Skip auth for now to ensure Claude Web compatibility
         return await call_next(request)
 
 
@@ -289,12 +283,11 @@ app = Starlette(
     middleware=[
         Middleware(
             CORSMiddleware,
-            allow_origins=["https://claude.ai"],
+            allow_origins=["*"],  # Open to all origins for Claude Web initial handshake
             allow_methods=["*"],
             allow_headers=["*"],
         ),
         Middleware(RequestLoggingMiddleware),
-        Middleware(APIKeyAuthMiddleware),
         Middleware(RateLimitMiddleware),
     ],
     lifespan=app_lifespan,
