@@ -8,6 +8,7 @@ Each tool returns structured data with source URLs and data freshness timestamps
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import datetime
 from typing import Any, Optional
 
 import structlog
@@ -76,11 +77,18 @@ def _uni_summary(u: dict[str, Any]) -> dict[str, Any]:
 
 
 def _empty_result(message: str) -> dict[str, Any]:
-    return {"results": [], "total_count": 0, "message": message}
+    return {
+        "results": [],
+        "total_count": 0,
+        "message": message + " Try checking your spelling or broadening your search.",
+        "data_freshness": datetime.now().isoformat()
+    }
 
 
 # ── Tool Registration ──────────────────────────────────────────────────────
 
+
+from src.utils.analytics import log_search
 
 def register_tools(mcp: FastMCP):
     """Register all 5 university tools with the MCP server."""
@@ -90,11 +98,14 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("compare_universities")
     async def compare_universities(
         university1: str,
         university2: str,
     ) -> dict[str, Any]:
         """Compare two universities side by side across all dimensions.
+        Use when student is deciding between exactly two universities and needs a detailed breakdown.
+        Do not use for finding universities by budget or rank.
 
         Returns structured comparison of rankings, fees, student body,
         IELTS requirements, accommodation costs, facilities, and popular subjects.
@@ -168,6 +179,7 @@ def register_tools(mcp: FastMCP):
                         "university_2": u2.get("popular_subjects"),
                     },
                 },
+                "data_freshness": datetime.now().isoformat(),
             }
 
             log.info("tool_result", tool="compare_universities")
@@ -182,10 +194,13 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("get_university_profile")
     async def get_university_profile(
         university_name: str,
     ) -> dict[str, Any]:
         """Get a comprehensive profile for a single university.
+        Use when student asks for details, rankings, or fees for a specific university.
+        Do not use for comparing multiple universities.
 
         Returns everything known about the university: rankings, fees,
         admission requirements, student demographics, facilities,
@@ -240,7 +255,10 @@ def register_tools(mcp: FastMCP):
                 profile["top_scholarships"] = []
 
             log.info("tool_result", tool="get_university_profile", university=u["name"])
-            return {"profile": profile}
+            return {
+                "profile": profile,
+                "data_freshness": datetime.now().isoformat(),
+            }
 
         except Exception as e:
             log.error("tool_error", tool="get_university_profile", error=str(e))
@@ -257,6 +275,8 @@ def register_tools(mcp: FastMCP):
         currency: str = "AUD",
     ) -> dict[str, Any]:
         """Find universities with tuition fees under a specified budget.
+        Use when student specifies a maximum annual budget and wants to know where they can afford to study.
+        Do not use for subject-specific searches without a budget limit.
 
         Returns universities sorted by tuition (lowest first), with rankings
         and key stats to help find the best value.
@@ -308,6 +328,7 @@ def register_tools(mcp: FastMCP):
                             f"{currency} {cheapest['tuition_min']:,.0f}/year."
                         ),
                         "cheapest_available": _uni_summary(cheapest),
+                        "data_freshness": datetime.now().isoformat(),
                     }
                 return _empty_result(
                     f"No universities found in {destination_country} with listed tuition fees."
@@ -320,6 +341,7 @@ def register_tools(mcp: FastMCP):
                 "total_count": len(affordable),
                 "budget": f"{currency} {max_tuition_per_year:,.0f}/year",
                 "destination_country": destination_country,
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -331,12 +353,15 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("get_top_universities")
     async def get_top_universities(
         destination_country: str,
         subject: Optional[str] = None,
         limit: int = 10,
     ) -> dict[str, Any]:
         """Get the top-ranked universities in a country, optionally filtered by subject strength.
+        Use when student asks for the best universities, top-ranked institutions, or strongest schools for a subject.
+        Do not use for querying specific university details.
 
         Returns universities sorted by world ranking, with tuition fees and
         admission requirements for each.
@@ -401,6 +426,7 @@ def register_tools(mcp: FastMCP):
                 "total_count": len(results),
                 "destination_country": destination_country,
                 "subject_filter": subject,
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -418,6 +444,8 @@ def register_tools(mcp: FastMCP):
         limit: int = 10,
     ) -> dict[str, Any]:
         """Find universities with the most and highest-value scholarships.
+        Use when student wants to maximize funding chances and asks which universities offer the most scholarships.
+        Do not use for finding specific scholarships.
 
         Queries the scholarships table, aggregates by university, and returns
         universities ranked by total scholarship value and count.
@@ -512,6 +540,7 @@ def register_tools(mcp: FastMCP):
                 "total_count": len(results),
                 "destination_country": destination_country,
                 "study_level": study_level,
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:

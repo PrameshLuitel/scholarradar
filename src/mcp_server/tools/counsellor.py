@@ -83,6 +83,8 @@ _HIGH_SCRUTINY = {"nepal", "nepalese", "bangladesh", "bangladeshi", "pakistan",
 
 # ── Tool Registration ──────────────────────────────────────────────────────
 
+from src.utils.analytics import log_search
+
 def register_tools(mcp: FastMCP):
     """Register the counsellor mega tool plus the booking tool."""
 
@@ -91,6 +93,9 @@ def register_tools(mcp: FastMCP):
         name: str, email: str, destination: str,
     ) -> dict[str, Any]:
         """Book a free counselling session with IDP experts.
+        Use when student wants to speak to a human counsellor or book an appointment.
+        Do not use for answering informational questions.
+
         Args:
             name: Student name.
             email: Contact email.
@@ -107,6 +112,7 @@ def register_tools(mcp: FastMCP):
                     "destination": destination,
                     "note": "An IDP counsellor will contact you within 24 hours.",
                 },
+                "data_freshness": datetime.now().isoformat(),
             }
         except Exception as e:
             log.error("tool_error", tool="book_counselling_session", error=str(e))
@@ -118,6 +124,9 @@ def register_tools(mcp: FastMCP):
         destination_country: Optional[str] = None,
     ) -> dict[str, Any]:
         """Search across all data — scholarships, courses, and universities.
+        Use when student provides a vague keyword or you are unsure which domain to search.
+        Do not use when student specifically asks for only courses or only scholarships.
+
         A quick cross-domain search for any keyword.
         Args:
             query: Search term, e.g. "data science", "engineering scholarship".
@@ -150,7 +159,8 @@ def register_tools(mcp: FastMCP):
                     results["universities"].append(u)
             total = sum(len(v) for v in results.values())
             return {"query": query, "results": results, "total_results": total,
-                    "message": f"Found {total} results across all categories." if total else "No results found. Try different keywords."}
+                    "message": f"Found {total} results across all categories." if total else "No results found. Try different keywords.",
+                    "data_freshness": datetime.now().isoformat()}
         except Exception as e:
             log.error("tool_error", tool="search_all", error=str(e))
             return {"error": "Search failed.", "error_type": "tool_error"}
@@ -160,6 +170,7 @@ def register_tools(mcp: FastMCP):
     # ════════════════════════════════════════════════════════════════════
 
     @mcp.tool()
+    @log_search("plan_study_abroad_journey")
     async def plan_study_abroad_journey(
         nationality: str,
         current_qualification: str,
@@ -171,6 +182,8 @@ def register_tools(mcp: FastMCP):
         career_goal: Optional[str] = None,
     ) -> dict[str, Any]:
         """Create a comprehensive, personalized study abroad plan in one call.
+        Use when student wants a complete A-Z plan across universities, costs, scholarships, and visa.
+        Do not use for simple, single-domain queries like 'what is the visa fee'.
 
         This is a full counselling consultation that analyzes:
         - Best matching courses for your profile
@@ -631,16 +644,19 @@ def register_tools(mcp: FastMCP):
             elapsed = round(time.time() - started, 2)
 
             result = {
-                "profile_summary": profile_summary,
-                "recommended_courses": top_courses,
-                "matched_scholarships": top_scholarships,
-                "financial_breakdown": financial_breakdowns,
-                "best_value_option": best_financial,
-                "visa_assessment": visa_assessments,
+                "student_summary": profile_summary,
+                "recommended_path": top_courses,
+                "top_scholarships": top_scholarships,
+                "financial_summary": {
+                    "breakdowns": financial_breakdowns,
+                    "best_value": best_financial,
+                },
+                "visa_summary": visa_assessments,
                 "ielts_analysis": ielts_analysis,
-                "application_timeline": timeline,
+                "action_timeline": timeline,
                 "next_steps": next_steps,
                 "warnings": warnings if warnings else None,
+                "data_freshness": datetime.now().isoformat(),
                 "metadata": {
                     "total_courses_analyzed": course_count,
                     "total_scholarships_analyzed": schol_count,
@@ -649,7 +665,6 @@ def register_tools(mcp: FastMCP):
                     "budget_usd": total_budget_usd,
                     "budget_aud_equivalent": round(budget_aud, 2),
                     "processing_time_seconds": elapsed,
-                    "generated_at": datetime.now().isoformat(),
                 },
             }
 
@@ -673,4 +688,5 @@ def register_tools(mcp: FastMCP):
                                 "subject": target_subject},
                     "suggestion": "Try again or narrow your search to one country.",
                 },
+                "data_freshness": datetime.now().isoformat()
             }

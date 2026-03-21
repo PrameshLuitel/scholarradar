@@ -136,11 +136,15 @@ def _empty_result(message: str) -> dict[str, Any]:
     return {
         "results": [],
         "total_count": 0,
-        "message": message,
+        "message": message + " Try broadening your search by removing the subject filter or increasing the minimum value.",
+        "data_freshness": datetime.now().isoformat(),
     }
 
 
 # ── Tool Registration ──────────────────────────────────────────────────────
+
+
+from src.utils.analytics import log_search
 
 
 def register_tools(mcp: FastMCP):
@@ -161,6 +165,8 @@ def register_tools(mcp: FastMCP):
         funding_type: Optional[str] = None,
     ) -> dict[str, Any]:
         """Search for scholarships available to students of a given nationality.
+        Use when student wants to search for scholarships by subject, value, or funding type.
+        Do not use for comparing multiple countries or getting quick summary statistics.
 
         Filters by destination country, study level, subject (fuzzy match),
         minimum award value, upcoming deadlines, and funding type.
@@ -284,6 +290,7 @@ def register_tools(mcp: FastMCP):
                     "deadline_after": deadline_after,
                     "funding_type": funding_type,
                 },
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -295,6 +302,7 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("match_profile")
     async def match_profile(
         nationality: str,
         current_qualification: str,
@@ -304,6 +312,8 @@ def register_tools(mcp: FastMCP):
         gpa: Optional[float] = None,
     ) -> dict[str, Any]:
         """Find the top 10 scholarships that best match a specific student profile.
+        Use when a student provides their full profile (GPA, IELTS, qualification) and asks what they qualify for.
+        Do not use for general broad searches or when the student hasn't provided academic details.
 
         Scores each scholarship on eligibility fit and returns match reasons
         plus an estimated likelihood of success.
@@ -469,6 +479,7 @@ def register_tools(mcp: FastMCP):
                     "ielts_score": ielts_score,
                     "gpa": gpa,
                 },
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -480,11 +491,14 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("get_closing_soon")
     async def get_closing_soon(
         days: int = 30,
         destination_country: Optional[str] = None,
     ) -> dict[str, Any]:
         """Get scholarships with deadlines closing within the next N days.
+        Use when student asks about urgent deadlines, scholarships closing soon, last chance funding, or time-sensitive opportunities.
+        Do not use for general scholarship browsing or checking past deadlines.
 
         Results are sorted by deadline ascending (soonest first).
         Each result includes a days_remaining field.
@@ -536,6 +550,7 @@ def register_tools(mcp: FastMCP):
                 "total_count": len(results),
                 "period_days": days,
                 "destination_country": destination_country,
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -547,11 +562,14 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("get_fully_funded")
     async def get_fully_funded(
         destination_country: str,
         study_level: Optional[str] = None,
     ) -> dict[str, Any]:
         """Get only fully-funded scholarships that cover full tuition and living expenses.
+        Use when student asks for full scholarships, complete funding, free education, or scholarships that cover all expenses.
+        Do not use for partial scholarships, fee waivers, or specific dollar value searches.
 
         Fully funded means the funding_type is 'full'. These typically cover
         tuition fees, living allowance, and sometimes travel costs.
@@ -591,6 +609,7 @@ def register_tools(mcp: FastMCP):
                 "total_count": len(results),
                 "destination_country": destination_country,
                 "study_level": study_level,
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -602,6 +621,7 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("get_by_university")
     async def get_by_university(
         university_name: str,
         limit: int = 20,
@@ -609,6 +629,8 @@ def register_tools(mcp: FastMCP):
         funding_type: Optional[str] = None,
     ) -> dict[str, Any]:
         """Get scholarships offered by a specific university.
+        Use when student asks about scholarships at a specific institution, like 'funding at Melbourne Uni'.
+        Do not use for comparing multiple universities or broad subject-based searches.
 
         Returns top scholarships sorted by deadline and value.
         Use limit parameter to control result count (default 20, max 50).
@@ -671,7 +693,8 @@ def register_tools(mcp: FastMCP):
                     "fully_funded": fully_funded_count,
                     "highest_value_aud": max_val,
                     "next_deadline": next_deadline,
-                }
+                },
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -683,6 +706,7 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("compare_scholarship_options")
     async def compare_scholarship_options(
         nationality: str,
         country1: str,
@@ -690,6 +714,8 @@ def register_tools(mcp: FastMCP):
         study_level: str,
     ) -> dict[str, Any]:
         """Compare scholarship availability between two countries side by side.
+        Use when student is deciding between two countries and wants to know which has better funding opportunities.
+        Do not use for comparing specific universities or checking a single country.
 
         Shows total count, funding types, value ranges, and deadline summary
         for each country so the student can make an informed decision.
@@ -787,6 +813,7 @@ def register_tools(mcp: FastMCP):
                     "nationality": nationality,
                     "study_level": study_level,
                 },
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -798,11 +825,14 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("get_scholarship_statistics")
     async def get_scholarship_statistics(
         destination_country: str,
         nationality: str,
     ) -> dict[str, Any]:
         """Get aggregated statistics about available scholarships for a country.
+        Use when student wants to understand the overall funding landscape before deep diving.
+        Do not use for finding specific individual scholarships to apply for.
 
         Returns total available, total value, average award amount,
         breakdown by study level and funding type, and deadline distribution.
@@ -905,6 +935,7 @@ def register_tools(mcp: FastMCP):
                 "by_funding_type": dict(sorted(by_funding.items(), key=lambda x: x[1], reverse=True)),
                 "by_source": dict(sorted(by_source.items(), key=lambda x: x[1], reverse=True)),
                 "deadline_distribution": deadline_buckets,
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -915,12 +946,15 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("get_scholarships_by_value")
     async def get_scholarships_by_value(
         min_value_aud: float,
         destination_country: Optional[str] = None,
         nationality: str = "nepalese",
     ) -> dict[str, Any]:
         """Find scholarships above a specified minimum dollar value.
+        Use when student specifies they need at least X amount in funding, or asks for the most valuable scholarships available.
+        Do not use for broad subject searches where funding amount isn't the primary filter.
 
         Use when the student specifies a minimum funding amount needed
         to cover their study costs.
@@ -968,8 +1002,78 @@ def register_tools(mcp: FastMCP):
                 "total_count": len(matches),
                 "min_value_aud": min_value_aud,
                 "destination_country": destination_country,
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
             log.error("tool_error", tool="get_scholarships_by_value", error=str(e))
             return {"error": "Failed to fetch scholarships by value.", "error_type": "tool_error"}
+
+    # ────────────────────────────────────────────────────────────────────
+    # 9. get_new_scholarships
+    # ────────────────────────────────────────────────────────────────────
+
+    @mcp.tool()
+    @log_search("get_new_scholarships")
+    async def get_new_scholarships(
+        nationality: str,
+        destination_country: Optional[str] = None,
+        days_back: int = 7,
+    ) -> dict[str, Any]:
+        """Find recently added scholarships in the database.
+        Use when student asks what new scholarships are available, fresh opportunities, or recently opened applications.
+        Do not use for exhaustive historical scholarship searches.
+
+        Args:
+            nationality: Student's nationality for eligibility check.
+            destination_country: Optional country filter, e.g. "australia".
+            days_back: Number of days to look back for newly added records (default 7).
+        """
+        try:
+            log.info("tool_call", tool="get_new_scholarships", parameters={
+                "nationality": nationality, "destination_country": destination_country, "days_back": days_back
+            })
+
+            # We use created_at to find newly added scholarships
+            db = _get_db()
+            cutoff_date = (datetime.now() - timedelta(days=days_back)).isoformat()
+            
+            query = db.table("scholarships").select("*").eq("is_active", True).gte("created_at", cutoff_date)
+            if destination_country:
+                query = query.ilike("country", destination_country.strip())
+                
+            response = query.order("created_at", desc=True).execute()
+            rows: list[dict[str, Any]] = response.data or []
+
+            if not rows:
+                return _empty_result(
+                    f"No new scholarships added in the last {days_back} days" +
+                    (f" for {destination_country}" if destination_country else "") +
+                    ". Try increasing the days_back parameter."
+                )
+
+            matches: list[dict[str, Any]] = []
+            for s in rows[:20]:  # Limit to 20 for brevity
+                item = _scholarship_summary(s)
+                item["date_added"] = s.get("created_at")
+                # Quick eligibility flag
+                elig = (s.get("eligibility") or "").lower()
+                if nationality.lower() in elig or "all international" in elig or not elig:
+                    item["eligibility_status"] = "likely_eligible"
+                else:
+                    item["eligibility_status"] = "check_requirements"
+                matches.append(item)
+
+            log.info("tool_result", tool="get_new_scholarships", result_count=len(matches))
+            return {
+                "results": matches,
+                "total_count": len(rows),
+                "showing": len(matches),
+                "days_back": days_back,
+                "data_freshness": datetime.now().isoformat(),
+            }
+
+        except Exception as e:
+            log.error("tool_error", tool="get_new_scholarships", error=str(e))
+            return {"error": "Failed to fetch new scholarships.", "error_type": "tool_error"}
+

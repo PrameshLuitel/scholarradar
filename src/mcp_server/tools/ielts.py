@@ -6,6 +6,7 @@ requirements, low-score options, and test information.
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Any, Optional
 
 import structlog
@@ -19,6 +20,8 @@ def _get_db():
     return get_db()
 
 
+from src.utils.analytics import log_search
+
 def register_tools(mcp: FastMCP):
     """Register all 4 IELTS tools with the MCP server."""
 
@@ -27,12 +30,15 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("check_ielts_eligibility")
     async def check_ielts_eligibility(
         ielts_score: float,
         destination_country: str,
         study_level: str,
     ) -> dict[str, Any]:
         """Check how many courses and universities a given IELTS score unlocks.
+        Use when student wants to know what their current IELTS score gets them or if they should retake.
+        Do not use for finding specific low IELTS courses.
 
         Shows current eligibility and what improving by 0.5 or 1.0 bands
         would unlock. Includes scholarship value accessible at each level.
@@ -150,6 +156,7 @@ def register_tools(mcp: FastMCP):
                 "improvement_advice": improvements,
                 "total_courses_in_database": len(courses),
                 "total_universities_in_database": len(universities),
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -161,11 +168,14 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("get_ielts_requirements")
     async def get_ielts_requirements(
         university_name: str,
         course_name: Optional[str] = None,
     ) -> dict[str, Any]:
         """Get the exact IELTS band requirements for a university or specific course.
+        Use when student asks 'what IELTS do I need for University X' or a specific course.
+        Do not use for general IELTS eligibility checks without a university in mind.
 
         Returns overall and per-skill (reading, writing, speaking, listening)
         requirements when available.
@@ -249,6 +259,7 @@ def register_tools(mcp: FastMCP):
             return {
                 "university_requirement": uni_info,
                 "course_requirements": course_requirements,
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -260,11 +271,14 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("find_low_ielts_options")
     async def find_low_ielts_options(
         current_ielts: float,
         destination_country: str,
     ) -> dict[str, Any]:
         """Find the best universities and courses accepting a lower IELTS score.
+        Use when student has a low IELTS score (e.g. 5.5) and asks where they can study.
+        Do not use for general test info.
 
         Ideal for students with IELTS below 6.5 who want to find options
         that match their current level. Includes pathway/foundation alternatives.
@@ -347,6 +361,7 @@ def register_tools(mcp: FastMCP):
                 "total_direct_entry": len(qualifying),
                 "total_pathways": len(pathways),
                 "advice": advice,
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -358,11 +373,14 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("get_ielts_test_info")
     async def get_ielts_test_info(
         city: str,
         country: str,
     ) -> dict[str, Any]:
         """Get IELTS test information for a specific city.
+        Use when student asks about IELTS fees, test centers, or how to book a test.
+        Do not use for university requirements.
 
         Returns test types available, approximate fees, registration info,
         and useful links. Note: Exact test dates require checking the official
@@ -465,6 +483,7 @@ def register_tools(mcp: FastMCP):
                     "british_council": "https://www.britishcouncil.org/exam/ielts",
                     "free_practice": "https://www.ielts.org/for-test-takers/preparation-resources",
                 },
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:

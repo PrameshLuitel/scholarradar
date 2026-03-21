@@ -1,0 +1,89 @@
+import uuid
+import time
+import asyncio
+from functools import wraps
+from typing import Any, Callable, Dict
+import structlog
+
+from src.database.client import get_db
+
+logger = structlog.get_logger("mcp_server.analytics")
+
+def _do_log(tool_name: str, params: Dict[str, Any], results_count: int, response_time: int):
+    try:
+        db = get_db()
+        db.table("search_analytics").insert({
+            "tool_name": tool_name,
+            "nationality": params.get("nationality"),
+            "destination_country": params.get("destination_country"),
+            "study_level": params.get("study_level"),
+            "subject": params.get("subject"),
+            "funding_type": params.get("funding_type"),
+            "min_value_aud": params.get("min_value_aud"),
+            "ielts_score": params.get("ielts_score"),
+            "gpa": params.get("gpa"),
+            "results_returned": results_count,
+            "zero_results": results_count == 0,
+            "session_id": str(uuid.uuid4())[:8],
+            "response_time_ms": int(response_time)
+        }).execute()
+    except Exception as e:
+        logger.error("search_analytics_failed", tool=tool_name, error=str(e))
+
+
+def extract_results_count(result: Any) -> int:
+    """Safely extract integer count of results from tool dictionary outputs."""
+    if isinstance(result, dict):
+        # Specific mega tool structures
+        if "student_summary" in result and "error" not in result:
+            return 1 # successful complex response
+        
+        # Look for typical list keys
+        list_keys = ["scholarships", "courses", "universities", "results", 
+                     "timeline", "items", "matched_scholarships", 
+                     "recommended_courses", "recommended_path", "top_scholarships",
+                     "required_documents", "institutions"]
+        for key in list_keys:
+            if key in result and isinstance(result[key], list):
+                return len(result[key])
+        
+        # Look for explicit count fields
+        count_keys = ["total_count", "total_results", "count", "score", "total_required"]
+        for key in count_keys:
+            if key in result and isinstance(result[key], (int, float)):
+                # If total_count is 0, we genuinely found 0. 
+                return int(result[key])
+        
+        # If it returns an error dict
+        if "error" in result or "message" in result:
+            return 0
+            
+    return 1
+
+def log_search(tool_name: str):
+    """
+    Decorator for MCP tools to automatically log search analytics to Supabase.
+    Awaits the tool execution, extracts metrics, and fires a background thread for DB insertion.
+    """
+    def decorator(func: Callable):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            start_time = time.time()
+            try:
+                result = await func(*args, **kwargs)
+            except Exception:
+                raise
+            
+            end_time = time.time()
+            response_time_ms = int((end_time - start_time) * 1000)
+            
+            results_count = extract_results_count(result)
+            
+            # Fire and forget logging
+            asyncio.create_task(
+                asyncio.to_thread(_do_log, tool_name, kwargs, results_count, response_time_ms)
+            )
+            
+            return result
+        return wrapper
+    return decorator

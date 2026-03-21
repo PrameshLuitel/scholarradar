@@ -41,11 +41,27 @@ register_counsellor(mcp)
 # 3. Get MCP HTTP app (to use its lifespan)
 mcp_app = mcp.http_app()
 
+import contextlib
+from src.api.analytics import router as analytics_router
+
+@contextlib.asynccontextmanager
+async def combined_lifespan(app: FastAPI):
+    # Start the weekly report background scheduler
+    from src.jobs.weekly_report import start_scheduler
+    start_scheduler()
+    
+    # Enter FastMCP's lifespan
+    async with mcp_app.lifespan(app) as state:
+        yield state
+
 # 4. Create FastAPI app with FastMCP's lifespan
 app = FastAPI(
     title="ScholarRadar MCP",
-    lifespan=mcp_app.lifespan
+    lifespan=combined_lifespan
 )
+
+# 4.5 Include Analytics Endpoints
+app.include_router(analytics_router)
 
 # 5. CORS Middlewares
 app.add_middleware(

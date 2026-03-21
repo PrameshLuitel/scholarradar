@@ -4,6 +4,7 @@ destination comparisons, total cost calculations, and affordable city finding.
 """
 from __future__ import annotations
 from typing import Any, Optional
+from datetime import datetime
 import structlog
 from fastmcp import FastMCP
 
@@ -30,12 +31,18 @@ def _city_summary(c: dict[str, Any]) -> dict[str, Any]:
         "data_freshness": str(c["last_updated"]) if c.get("last_updated") else None,
     }
 
+from src.utils.analytics import log_search
+
 def register_tools(mcp: FastMCP):
     """Register all 4 cost of living tools."""
 
     @mcp.tool()
+    @log_search("get_city_budget")
     async def get_city_budget(city: str, country: str) -> dict[str, Any]:
         """Get detailed monthly cost breakdown for a specific city.
+        Use when student asks about living expenses, rent, or part-time wages in a particular city.
+        Do not use for calculating total course cost including tuition.
+
         Includes rent (shared/private), food, transport, utilities, internet,
         and part-time wage earning potential.
         Args:
@@ -79,17 +86,22 @@ def register_tools(mcp: FastMCP):
                 "Many universities offer free/subsidized meals and services",
             ]
             log.info("tool_result", tool="get_city_budget")
+            result["data_freshness"] = datetime.now().isoformat()
             return result
         except Exception as e:
             log.error("tool_error", tool="get_city_budget", error=str(e))
             return {"error": "Failed to get city budget.", "error_type": "tool_error"}
 
     @mcp.tool()
+    @log_search("compare_study_destinations")
     async def compare_study_destinations(
         city1: str, country1: str,
         city2: str, country2: str,
     ) -> dict[str, Any]:
         """Compare cost of living between two cities side by side.
+        Use when student wants to know which city is cheaper or comparing rent between two places.
+        Do not use for broad affordability searches across a whole country.
+
         Shows rent, food, transport, total monthly, and earning potential for each.
         Args:
             city1: First city, e.g. "Sydney".
@@ -130,12 +142,14 @@ def register_tools(mcp: FastMCP):
                     "food_cheaper": city1 if (float(r1[0].get("food_monthly") or 9999)) < (float(r2[0].get("food_monthly") or 9999)) else city2,
                     "transport_cheaper": city1 if (float(r1[0].get("transport_monthly") or 9999) < float(r2[0].get("transport_monthly") or 9999)) else city2,
                 },
+                "data_freshness": datetime.now().isoformat(),
             }
         except Exception as e:
             log.error("tool_error", tool="compare_study_destinations", error=str(e))
             return {"error": "Failed to compare destinations.", "error_type": "tool_error"}
 
     @mcp.tool()
+    @log_search("calculate_total_cost")
     async def calculate_total_cost(
         city: str, country: str,
         course_duration_months: int,
@@ -144,6 +158,9 @@ def register_tools(mcp: FastMCP):
         nationality: Optional[str] = None,
     ) -> dict[str, Any]:
         """Calculate total cost for entire course duration including living, visa, OSHC, flights.
+        Use when student asks for the grand total, total budget needed, or 'how much will it cost to study'.
+        Do not use for finding cheap universities; use find_universities_by_budget instead.
+
         Args:
             city: Study city, e.g. "Sydney".
             country: Study country, e.g. "australia".
@@ -213,17 +230,22 @@ def register_tools(mcp: FastMCP):
                 "net_cost_after_earnings": round(float(net_cost), 2),
                 "accommodation_type": accommodation_type,
                 "currency": "AUD",
+                "data_freshness": datetime.now().isoformat(),
             }
         except Exception as e:
             log.error("tool_error", tool="calculate_total_cost", error=str(e))
             return {"error": "Failed to calculate total cost.", "error_type": "tool_error"}
 
     @mcp.tool()
+    @log_search("find_affordable_destinations")
     async def find_affordable_destinations(
         monthly_budget_aud: float,
         destination_country: str,
     ) -> dict[str, Any]:
         """Find the most affordable cities for study within a monthly budget.
+        Use when student specifies a living budget and asks where they can afford to live.
+        Do not use for comparing two specific cities.
+
         Returns cities sorted by total monthly cost (cheapest first),
         with budget fit analysis.
         Args:
@@ -265,6 +287,7 @@ def register_tools(mcp: FastMCP):
                     f"No cities in {destination_country} fit AUD {monthly_budget_aud:,.0f}/month. "
                     f"Cheapest is {cities[0][1]['city']} at AUD {cities[0][0]:,.0f}/month."
                 ),
+                "data_freshness": datetime.now().isoformat(),
             }
         except Exception as e:
             log.error("tool_error", tool="find_affordable_destinations", error=str(e))

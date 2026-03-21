@@ -107,11 +107,18 @@ def _course_summary(c: dict[str, Any]) -> dict[str, Any]:
 
 
 def _empty_result(message: str) -> dict[str, Any]:
-    return {"results": [], "total_count": 0, "message": message}
+    return {
+        "results": [],
+        "total_count": 0,
+        "message": message + " Try broadening your search or modifying filters.",
+        "data_freshness": datetime.now().isoformat()
+    }
 
 
 # ── Tool Registration ──────────────────────────────────────────────────────
 
+
+from src.utils.analytics import log_search
 
 def register_tools(mcp: FastMCP):
     """Register all 5 course tools with the MCP server."""
@@ -121,6 +128,7 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("search_courses")
     async def search_courses(
         subject: str,
         destination_country: str,
@@ -130,6 +138,8 @@ def register_tools(mcp: FastMCP):
         min_ielts: Optional[float] = None,
     ) -> dict[str, Any]:
         """Search for courses by subject, country, and study level with optional filters.
+        Use when student asks about courses to study, what programs are available, which universities offer a specific degree, or what to study in a country.
+        Do not use for comparing two specific programs side-by-side.
 
         Returns the top 20 matching courses ranked by subject relevance,
         with full details including fees, duration, IELTS requirements, and entry criteria.
@@ -207,6 +217,7 @@ def register_tools(mcp: FastMCP):
                     "max_duration_months": max_duration_months,
                     "min_ielts": min_ielts,
                 },
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -218,6 +229,7 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("compare_courses")
     async def compare_courses(
         course1_name: str,
         university1: str,
@@ -225,6 +237,8 @@ def register_tools(mcp: FastMCP):
         university2: str,
     ) -> dict[str, Any]:
         """Compare two specific courses side by side.
+        Use when student is deciding between two programs or universities and wants a direct comparison.
+        Do not use for comparing universities without specific courses.
 
         Returns a structured comparison of fees, duration, IELTS requirements,
         entry qualifications, location, and start dates.
@@ -299,6 +313,7 @@ def register_tools(mcp: FastMCP):
                         "course_2": s2.get("start_dates"),
                     },
                 },
+                "data_freshness": datetime.now().isoformat(),
             }
 
             log.info("tool_result", tool="compare_courses")
@@ -313,6 +328,7 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("find_courses_for_profile")
     async def find_courses_for_profile(
         current_qualification: str,
         target_subject: str,
@@ -321,6 +337,8 @@ def register_tools(mcp: FastMCP):
         destination_country: Optional[str] = None,
     ) -> dict[str, Any]:
         """Find courses a student can actually get into based on their profile.
+        Use when student wants to know which courses they qualify for right now, or what is realistic given their scores.
+        Do not use for general course exploration without academic scores.
 
         Checks IELTS requirements and tuition budget, then returns qualifying
         courses plus a gap analysis showing what the student needs to improve
@@ -443,6 +461,7 @@ def register_tools(mcp: FastMCP):
                     "budget_aud_per_year": budget_aud_per_year,
                     "destination_country": destination_country,
                 },
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -454,12 +473,15 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("get_pathway_options")
     async def get_pathway_options(
         current_qualification: str,
         target_degree: str,
         target_university: str,
     ) -> dict[str, Any]:
         """Find foundation and pathway courses that lead to a target degree program.
+        Use when student doesn't meet entry requirements, needs a bridge program, or asks about foundation years.
+        Do not use when student comfortably meets direct entry requirements.
 
         Useful for students who don't yet meet direct entry requirements.
         Searches for foundation, diploma, and pathway programs at or associated
@@ -528,6 +550,7 @@ def register_tools(mcp: FastMCP):
                     "No specific pathway courses found. Contact the university's "
                     "international admissions office for alternative entry options."
                 ),
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -539,12 +562,15 @@ def register_tools(mcp: FastMCP):
     # ────────────────────────────────────────────────────────────────────
 
     @mcp.tool()
+    @log_search("get_courses_by_ielts")
     async def get_courses_by_ielts(
         ielts_score: float,
         destination_country: str,
         study_level: str,
     ) -> dict[str, Any]:
         """Find all courses where the student's IELTS score meets the requirement.
+        Use when student asks what they can study with their IELTS score, or how many courses their score unlocks.
+        Do not use for calculating IELTS improvements.
 
         Returns courses grouped by whether the student comfortably meets,
         exactly meets, or is close to meeting the IELTS requirement.
@@ -608,6 +634,7 @@ def register_tools(mcp: FastMCP):
                 },
                 "destination_country": destination_country,
                 "study_level": study_level,
+                "data_freshness": datetime.now().isoformat(),
             }
 
         except Exception as e:

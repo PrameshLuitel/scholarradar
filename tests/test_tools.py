@@ -186,15 +186,13 @@ def _patch_empty_db(monkeypatch):
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
-def _get_tool_fn(name: str):
+async def _get_tool_fn(name: str):
     """Import and return a tool function from the MCP server."""
     from src.mcp_server.server import mcp
-    tools = mcp._tool_manager.list_tools()
-    for t in tools:
-        if t.name == name:
-            # Get the handler function
-            return mcp._tool_manager._tools[name].fn
-    raise ValueError(f"Tool '{name}' not found. Available: {[t.name for t in tools]}")
+    tool = await mcp.get_tool(name)
+    if not tool:
+        raise ValueError(f"Tool '{name}' not found.")
+    return tool.fn
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -204,7 +202,7 @@ def _get_tool_fn(name: str):
 class TestSearchScholarships:
     @pytest.mark.asyncio
     async def test_returns_results_for_nepal_australia_phd(self):
-        fn = _get_tool_fn("search_scholarships")
+        fn = await _get_tool_fn("search_scholarships")
         result = await fn(nationality="nepal", destination_country="australia",
                           study_level="doctorate")
         assert isinstance(result, dict)
@@ -212,7 +210,7 @@ class TestSearchScholarships:
 
     @pytest.mark.asyncio
     async def test_handles_empty_db(self, _patch_empty_db):
-        fn = _get_tool_fn("search_scholarships")
+        fn = await _get_tool_fn("search_scholarships")
         result = await fn(nationality="nepal")
         assert isinstance(result, dict)
         # Should have a message or empty results, not crash
@@ -222,7 +220,7 @@ class TestSearchScholarships:
 class TestMatchProfile:
     @pytest.mark.asyncio
     async def test_returns_matches_with_reasons(self):
-        fn = _get_tool_fn("match_profile")
+        fn = await _get_tool_fn("match_profile")
         result = await fn(
             nationality="nepal",
             current_qualification="Bachelor of Engineering",
@@ -235,7 +233,7 @@ class TestMatchProfile:
 
     @pytest.mark.asyncio
     async def test_handles_empty_db(self, _patch_empty_db):
-        fn = _get_tool_fn("match_profile")
+        fn = await _get_tool_fn("match_profile")
         result = await fn(
             nationality="nepal",
             current_qualification="Bachelor",
@@ -249,13 +247,13 @@ class TestMatchProfile:
 class TestGetClosingSoon:
     @pytest.mark.asyncio
     async def test_returns_results(self):
-        fn = _get_tool_fn("get_closing_soon")
+        fn = await _get_tool_fn("get_closing_soon")
         result = await fn(days=90)
         assert isinstance(result, dict)
 
     @pytest.mark.asyncio
     async def test_handles_empty_db(self, _patch_empty_db):
-        fn = _get_tool_fn("get_closing_soon")
+        fn = await _get_tool_fn("get_closing_soon")
         result = await fn()
         assert isinstance(result, dict)
 
@@ -263,7 +261,7 @@ class TestGetClosingSoon:
 class TestGetFullyFunded:
     @pytest.mark.asyncio
     async def test_returns_results(self):
-        fn = _get_tool_fn("get_fully_funded")
+        fn = await _get_tool_fn("get_fully_funded")
         result = await fn(destination_country="australia")
         assert isinstance(result, dict)
 
@@ -271,7 +269,7 @@ class TestGetFullyFunded:
 class TestGetByUniversity:
     @pytest.mark.asyncio
     async def test_returns_results(self):
-        fn = _get_tool_fn("get_by_university")
+        fn = await _get_tool_fn("get_by_university")
         result = await fn(university_name="University of Melbourne")
         assert isinstance(result, dict)
 
@@ -279,7 +277,7 @@ class TestGetByUniversity:
 class TestCompareScholarshipOptions:
     @pytest.mark.asyncio
     async def test_returns_comparison(self):
-        fn = _get_tool_fn("compare_scholarship_options")
+        fn = await _get_tool_fn("compare_scholarship_options")
         result = await fn(
             nationality="nepal",
             country1="australia",
@@ -292,7 +290,7 @@ class TestCompareScholarshipOptions:
 class TestGetScholarshipStatistics:
     @pytest.mark.asyncio
     async def test_returns_stats(self):
-        fn = _get_tool_fn("get_scholarship_statistics")
+        fn = await _get_tool_fn("get_scholarship_statistics")
         result = await fn(destination_country="australia", nationality="nepalese")
         assert isinstance(result, dict)
 
@@ -304,7 +302,7 @@ class TestGetScholarshipStatistics:
 class TestSearchCourses:
     @pytest.mark.asyncio
     async def test_returns_results(self):
-        fn = _get_tool_fn("search_courses")
+        fn = await _get_tool_fn("search_courses")
         result = await fn(subject="Computer Science", destination_country="australia",
                           study_level="postgraduate")
         assert isinstance(result, dict)
@@ -312,7 +310,7 @@ class TestSearchCourses:
 
     @pytest.mark.asyncio
     async def test_handles_empty_db(self, _patch_empty_db):
-        fn = _get_tool_fn("search_courses")
+        fn = await _get_tool_fn("search_courses")
         result = await fn(subject="XYZ", destination_country="mars",
                           study_level="unknown")
         assert isinstance(result, dict)
@@ -321,7 +319,7 @@ class TestSearchCourses:
 class TestCompareCourses:
     @pytest.mark.asyncio
     async def test_returns_comparison(self):
-        fn = _get_tool_fn("compare_courses")
+        fn = await _get_tool_fn("compare_courses")
         result = await fn(
             course1_name="Master of Computer Science",
             university1="University of Melbourne",
@@ -334,7 +332,7 @@ class TestCompareCourses:
 class TestFindCoursesForProfile:
     @pytest.mark.asyncio
     async def test_returns_with_gap_analysis(self):
-        fn = _get_tool_fn("find_courses_for_profile")
+        fn = await _get_tool_fn("find_courses_for_profile")
         result = await fn(
             current_qualification="Bachelor of Engineering",
             target_subject="Computer Science",
@@ -348,7 +346,7 @@ class TestFindCoursesForProfile:
 class TestGetPathwayOptions:
     @pytest.mark.asyncio
     async def test_returns_results(self):
-        fn = _get_tool_fn("get_pathway_options")
+        fn = await _get_tool_fn("get_pathway_options")
         result = await fn(
             current_qualification="High School",
             target_degree="Computer Science",
@@ -360,7 +358,7 @@ class TestGetPathwayOptions:
 class TestGetCoursesByIelts:
     @pytest.mark.asyncio
     async def test_returns_grouped_results(self):
-        fn = _get_tool_fn("get_courses_by_ielts")
+        fn = await _get_tool_fn("get_courses_by_ielts")
         result = await fn(ielts_score=6.5, destination_country="australia",
                           study_level="postgraduate")
         assert isinstance(result, dict)
@@ -373,7 +371,7 @@ class TestGetCoursesByIelts:
 class TestCompareUniversities:
     @pytest.mark.asyncio
     async def test_returns_comparison(self):
-        fn = _get_tool_fn("compare_universities")
+        fn = await _get_tool_fn("compare_universities")
         result = await fn(
             university1="University of Melbourne",
             university2="University of Melbourne",
@@ -384,14 +382,14 @@ class TestCompareUniversities:
 class TestGetUniversityProfile:
     @pytest.mark.asyncio
     async def test_returns_full_profile(self):
-        fn = _get_tool_fn("get_university_profile")
+        fn = await _get_tool_fn("get_university_profile")
         result = await fn(university_name="University of Melbourne")
         assert isinstance(result, dict)
         assert "error" not in result
 
     @pytest.mark.asyncio
     async def test_handles_unknown_uni(self, _patch_empty_db):
-        fn = _get_tool_fn("get_university_profile")
+        fn = await _get_tool_fn("get_university_profile")
         result = await fn(university_name="Nonexistent University")
         assert isinstance(result, dict)
 
@@ -399,7 +397,7 @@ class TestGetUniversityProfile:
 class TestFindUniversitiesByBudget:
     @pytest.mark.asyncio
     async def test_returns_results(self):
-        fn = _get_tool_fn("find_universities_by_budget")
+        fn = await _get_tool_fn("find_universities_by_budget")
         result = await fn(max_tuition_per_year=60000, destination_country="australia")
         assert isinstance(result, dict)
 
@@ -407,7 +405,7 @@ class TestFindUniversitiesByBudget:
 class TestGetTopUniversities:
     @pytest.mark.asyncio
     async def test_returns_ranked_list(self):
-        fn = _get_tool_fn("get_top_universities")
+        fn = await _get_tool_fn("get_top_universities")
         result = await fn(destination_country="australia")
         assert isinstance(result, dict)
 
@@ -415,7 +413,7 @@ class TestGetTopUniversities:
 class TestGetScholarshipRichUniversities:
     @pytest.mark.asyncio
     async def test_returns_results(self):
-        fn = _get_tool_fn("get_scholarship_rich_universities")
+        fn = await _get_tool_fn("get_scholarship_rich_universities")
         result = await fn(destination_country="australia")
         assert isinstance(result, dict)
 
@@ -427,7 +425,7 @@ class TestGetScholarshipRichUniversities:
 class TestCheckIeltsEligibility:
     @pytest.mark.asyncio
     async def test_returns_eligibility(self):
-        fn = _get_tool_fn("check_ielts_eligibility")
+        fn = await _get_tool_fn("check_ielts_eligibility")
         result = await fn(ielts_score=6.5, destination_country="australia",
                           study_level="postgraduate")
         assert isinstance(result, dict)
@@ -435,7 +433,7 @@ class TestCheckIeltsEligibility:
 
     @pytest.mark.asyncio
     async def test_handles_empty_db(self, _patch_empty_db):
-        fn = _get_tool_fn("check_ielts_eligibility")
+        fn = await _get_tool_fn("check_ielts_eligibility")
         result = await fn(ielts_score=6.0, destination_country="mars",
                           study_level="postgraduate")
         assert isinstance(result, dict)
@@ -444,13 +442,13 @@ class TestCheckIeltsEligibility:
 class TestGetIeltsRequirements:
     @pytest.mark.asyncio
     async def test_returns_requirements(self):
-        fn = _get_tool_fn("get_ielts_requirements")
+        fn = await _get_tool_fn("get_ielts_requirements")
         result = await fn(university_name="University of Melbourne")
         assert isinstance(result, dict)
 
     @pytest.mark.asyncio
     async def test_with_course_name(self):
-        fn = _get_tool_fn("get_ielts_requirements")
+        fn = await _get_tool_fn("get_ielts_requirements")
         result = await fn(university_name="Melbourne", course_name="Computer Science")
         assert isinstance(result, dict)
 
@@ -458,7 +456,7 @@ class TestGetIeltsRequirements:
 class TestFindLowIeltsOptions:
     @pytest.mark.asyncio
     async def test_returns_options(self):
-        fn = _get_tool_fn("find_low_ielts_options")
+        fn = await _get_tool_fn("find_low_ielts_options")
         result = await fn(current_ielts=5.5, destination_country="australia")
         assert isinstance(result, dict)
 
@@ -466,7 +464,7 @@ class TestFindLowIeltsOptions:
 class TestGetIeltsTestInfo:
     @pytest.mark.asyncio
     async def test_returns_nepal_info(self):
-        fn = _get_tool_fn("get_ielts_test_info")
+        fn = await _get_tool_fn("get_ielts_test_info")
         result = await fn(city="Kathmandu", country="nepal")
         assert isinstance(result, dict)
         assert "test_types" in result
@@ -475,7 +473,7 @@ class TestGetIeltsTestInfo:
 
     @pytest.mark.asyncio
     async def test_unknown_country_has_fallback(self):
-        fn = _get_tool_fn("get_ielts_test_info")
+        fn = await _get_tool_fn("get_ielts_test_info")
         result = await fn(city="Mars City", country="mars")
         assert isinstance(result, dict)
         assert "local_info" in result
@@ -488,14 +486,14 @@ class TestGetIeltsTestInfo:
 class TestGetVisaRequirements:
     @pytest.mark.asyncio
     async def test_returns_requirements(self):
-        fn = _get_tool_fn("get_visa_requirements")
+        fn = await _get_tool_fn("get_visa_requirements")
         result = await fn(nationality="nepal", destination_country="australia")
         assert isinstance(result, dict)
         assert "error" not in result
 
     @pytest.mark.asyncio
     async def test_handles_unknown_nationality(self, _patch_empty_db):
-        fn = _get_tool_fn("get_visa_requirements")
+        fn = await _get_tool_fn("get_visa_requirements")
         result = await fn(nationality="martian", destination_country="australia")
         assert isinstance(result, dict)
         assert result.get("total_count", 0) == 0 or "message" in result
@@ -504,7 +502,7 @@ class TestGetVisaRequirements:
 class TestCalculateFinancialProof:
     @pytest.mark.asyncio
     async def test_returns_breakdown(self):
-        fn = _get_tool_fn("calculate_financial_proof")
+        fn = await _get_tool_fn("calculate_financial_proof")
         result = await fn(
             nationality="nepal", destination_country="australia",
             course_duration_months=24, annual_tuition_aud=45000,
@@ -516,7 +514,7 @@ class TestCalculateFinancialProof:
 
     @pytest.mark.asyncio
     async def test_with_scholarship(self):
-        fn = _get_tool_fn("calculate_financial_proof")
+        fn = await _get_tool_fn("calculate_financial_proof")
         result = await fn(
             nationality="nepal", destination_country="australia",
             course_duration_months=24, annual_tuition_aud=45000,
@@ -529,7 +527,7 @@ class TestCalculateFinancialProof:
 class TestGetVisaChecklist:
     @pytest.mark.asyncio
     async def test_returns_checklist(self):
-        fn = _get_tool_fn("get_visa_checklist")
+        fn = await _get_tool_fn("get_visa_checklist")
         result = await fn(nationality="nepal", destination_country="australia")
         assert isinstance(result, dict)
         assert result["total_required"] > 0
@@ -539,7 +537,7 @@ class TestGetVisaChecklist:
 class TestGetProcessingTimeline:
     @pytest.mark.asyncio
     async def test_returns_timeline(self):
-        fn = _get_tool_fn("get_processing_timeline")
+        fn = await _get_tool_fn("get_processing_timeline")
         future = (date.today() + timedelta(days=180)).isoformat()
         result = await fn(nationality="nepal", destination_country="australia",
                           course_start_date=future)
@@ -549,7 +547,7 @@ class TestGetProcessingTimeline:
 
     @pytest.mark.asyncio
     async def test_invalid_date_returns_error(self):
-        fn = _get_tool_fn("get_processing_timeline")
+        fn = await _get_tool_fn("get_processing_timeline")
         result = await fn(nationality="nepal", destination_country="australia",
                           course_start_date="not-a-date")
         assert "error" in result
@@ -558,7 +556,7 @@ class TestGetProcessingTimeline:
 class TestAssessVisaStrength:
     @pytest.mark.asyncio
     async def test_returns_assessment(self):
-        fn = _get_tool_fn("assess_visa_strength")
+        fn = await _get_tool_fn("assess_visa_strength")
         result = await fn(
             nationality="nepal", destination_country="australia",
             age=25, has_financial_proof=True, financial_amount_aud=80000,
@@ -573,7 +571,7 @@ class TestAssessVisaStrength:
 
     @pytest.mark.asyncio
     async def test_nepal_specific_advice(self):
-        fn = _get_tool_fn("assess_visa_strength")
+        fn = await _get_tool_fn("assess_visa_strength")
         result = await fn(
             nationality="nepal", destination_country="australia",
             age=25, has_financial_proof=True, financial_amount_aud=50000,
@@ -585,7 +583,7 @@ class TestAssessVisaStrength:
 
     @pytest.mark.asyncio
     async def test_weak_application_flagged(self):
-        fn = _get_tool_fn("assess_visa_strength")
+        fn = await _get_tool_fn("assess_visa_strength")
         result = await fn(
             nationality="nepal", destination_country="australia",
             age=38, has_financial_proof=False, financial_amount_aud=0,
@@ -604,14 +602,14 @@ class TestAssessVisaStrength:
 class TestGetCityBudget:
     @pytest.mark.asyncio
     async def test_returns_budget(self):
-        fn = _get_tool_fn("get_city_budget")
+        fn = await _get_tool_fn("get_city_budget")
         result = await fn(city="Melbourne", country="australia")
         assert isinstance(result, dict)
         assert "error" not in result
 
     @pytest.mark.asyncio
     async def test_handles_unknown_city(self, _patch_empty_db):
-        fn = _get_tool_fn("get_city_budget")
+        fn = await _get_tool_fn("get_city_budget")
         result = await fn(city="Atlantis", country="ocean")
         assert isinstance(result, dict)
         assert result.get("total_count", 0) == 0 or "message" in result
@@ -620,7 +618,7 @@ class TestGetCityBudget:
 class TestCompareStudyDestinations:
     @pytest.mark.asyncio
     async def test_returns_comparison(self):
-        fn = _get_tool_fn("compare_study_destinations")
+        fn = await _get_tool_fn("compare_study_destinations")
         result = await fn(city1="Melbourne", country1="australia",
                           city2="Melbourne", country2="australia")
         assert isinstance(result, dict)
@@ -629,7 +627,7 @@ class TestCompareStudyDestinations:
 class TestCalculateTotalCost:
     @pytest.mark.asyncio
     async def test_returns_full_breakdown(self):
-        fn = _get_tool_fn("calculate_total_cost")
+        fn = await _get_tool_fn("calculate_total_cost")
         result = await fn(city="Melbourne", country="australia",
                           course_duration_months=24, annual_tuition_aud=45000)
         assert isinstance(result, dict)
@@ -638,7 +636,7 @@ class TestCalculateTotalCost:
 
     @pytest.mark.asyncio
     async def test_handles_empty_db(self, _patch_empty_db):
-        fn = _get_tool_fn("calculate_total_cost")
+        fn = await _get_tool_fn("calculate_total_cost")
         result = await fn(city="NoCity", country="nocountry",
                           course_duration_months=12, annual_tuition_aud=30000)
         assert isinstance(result, dict)
@@ -647,7 +645,7 @@ class TestCalculateTotalCost:
 class TestFindAffordableDestinations:
     @pytest.mark.asyncio
     async def test_returns_cities(self):
-        fn = _get_tool_fn("find_affordable_destinations")
+        fn = await _get_tool_fn("find_affordable_destinations")
         result = await fn(monthly_budget_aud=3000, destination_country="australia")
         assert isinstance(result, dict)
 
@@ -659,12 +657,12 @@ class TestFindAffordableDestinations:
 class TestPlanStudyAbroadJourney:
     @pytest.mark.asyncio
     async def test_returns_complete_structured_response(self):
-        fn = _get_tool_fn("plan_study_abroad_journey")
+        fn = await _get_tool_fn("plan_study_abroad_journey")
         result = await fn(
             nationality="nepalese",
             current_qualification="Bachelor of Engineering, GPA 3.7",
             target_subject="Computer Science",
-            preferred_countries=["australia"],
+            preferred_countries="australia",
             total_budget_usd=60000,
             timeline_months=6,
             ielts_score=7.0,
@@ -672,28 +670,28 @@ class TestPlanStudyAbroadJourney:
         )
         assert isinstance(result, dict)
         # Must have all required sections
-        assert "profile_summary" in result
-        assert "recommended_courses" in result
-        assert "matched_scholarships" in result
-        assert "financial_breakdown" in result
-        assert "visa_assessment" in result
+        assert "student_summary" in result
+        assert "recommended_path" in result
+        assert "top_scholarships" in result
+        assert "financial_summary" in result
+        assert "visa_summary" in result
         assert "ielts_analysis" in result
-        assert "application_timeline" in result
+        assert "action_timeline" in result
         assert "next_steps" in result
-        assert "metadata" in result
-        assert isinstance(result["recommended_courses"], list)
-        assert isinstance(result["matched_scholarships"], list)
-        assert isinstance(result["application_timeline"], list)
+        assert "data_freshness" in result
+        assert isinstance(result["recommended_path"], list)
+        assert isinstance(result["top_scholarships"], list)
+        assert isinstance(result["action_timeline"], list)
         assert isinstance(result["next_steps"], list)
 
     @pytest.mark.asyncio
     async def test_works_without_ielts(self):
-        fn = _get_tool_fn("plan_study_abroad_journey")
+        fn = await _get_tool_fn("plan_study_abroad_journey")
         result = await fn(
             nationality="nepalese",
             current_qualification="Bachelor of Science",
             target_subject="Data Science",
-            preferred_countries=["australia"],
+            preferred_countries="australia",
             total_budget_usd=50000,
             timeline_months=8,
         )
@@ -702,27 +700,27 @@ class TestPlanStudyAbroadJourney:
 
     @pytest.mark.asyncio
     async def test_handles_empty_db(self, _patch_empty_db):
-        fn = _get_tool_fn("plan_study_abroad_journey")
+        fn = await _get_tool_fn("plan_study_abroad_journey")
         result = await fn(
             nationality="nepalese",
             current_qualification="Bachelor",
             target_subject="CS",
-            preferred_countries=["australia"],
+            preferred_countries="australia",
             total_budget_usd=30000,
             timeline_months=6,
         )
         assert isinstance(result, dict)
         # Should still return structured response even with no data
-        assert "profile_summary" in result or "error" in result
+        assert "student_summary" in result or "error" in result
 
     @pytest.mark.asyncio
     async def test_caching_returns_same_result(self):
-        fn = _get_tool_fn("plan_study_abroad_journey")
+        fn = await _get_tool_fn("plan_study_abroad_journey")
         params = dict(
             nationality="nepalese",
             current_qualification="Bachelor of Engineering",
             target_subject="Computer Science",
-            preferred_countries=["australia"],
+            preferred_countries="australia",
             total_budget_usd=60000,
             timeline_months=6,
             ielts_score=7.0,
@@ -735,14 +733,14 @@ class TestPlanStudyAbroadJourney:
 class TestSearchAll:
     @pytest.mark.asyncio
     async def test_returns_cross_domain_results(self):
-        fn = _get_tool_fn("search_all")
+        fn = await _get_tool_fn("search_all")
         result = await fn(query="Melbourne")
         assert isinstance(result, dict)
         assert "results" in result
 
     @pytest.mark.asyncio
     async def test_handles_empty_db(self, _patch_empty_db):
-        fn = _get_tool_fn("search_all")
+        fn = await _get_tool_fn("search_all")
         result = await fn(query="nonexistent")
         assert isinstance(result, dict)
         assert result.get("total_results", 0) == 0
@@ -751,7 +749,7 @@ class TestSearchAll:
 class TestBookCounsellingSession:
     @pytest.mark.asyncio
     async def test_returns_success(self):
-        fn = _get_tool_fn("book_counselling_session")
+        fn = await _get_tool_fn("book_counselling_session")
         result = await fn(name="Test Student", email="test@example.com",
                           destination="australia")
         assert result["status"] == "success"

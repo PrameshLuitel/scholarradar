@@ -33,12 +33,18 @@ def _get_db():
     from src.database.client import get_db
     return get_db()
 
+from src.utils.analytics import log_search
+
 def register_tools(mcp: FastMCP):
     """Register all 5 visa tools."""
 
     @mcp.tool()
+    @log_search("get_visa_requirements")
     async def get_visa_requirements(nationality:str, destination_country:str) -> dict[str,Any]:
         """Get full student visa requirements for a nationality and destination.
+        Use when student asks for general visa info, work rights, or processing times.
+        Do not use for assessing their specific profile strength.
+
         Returns visa type, financial requirements, processing times, work rights, and source URLs.
         Args:
             nationality: e.g. "nepal", "india".
@@ -71,16 +77,21 @@ def register_tools(mcp: FastMCP):
                 result["scrutiny_warning"] = (
                     f"Applications from {nationality} receive enhanced scrutiny. "
                     "Ensure GTE is detailed, financials are robust, all docs certified.")
+            result["data_freshness"] = datetime.now().isoformat()
             return result
         except Exception as e:
             log.error("tool_error",tool="get_visa_requirements",error=str(e))
             return {"error":"Failed to get visa requirements.","error_type":"tool_error"}
 
     @mcp.tool()
+    @log_search("calculate_financial_proof")
     async def calculate_financial_proof(nationality:str, destination_country:str,
             course_duration_months:int, annual_tuition_aud:float,
             has_scholarship:bool=False, scholarship_value_aud:float=0) -> dict[str,Any]:
         """Calculate exact financial proof needed for student visa.
+        Use when student wants to know exactly how much money they need in their bank account for the visa.
+        Do not use for overall study cost calculation including full course duration.
+
         Breaks down tuition, living costs, OSHC, visa fees, travel.
         Args:
             nationality: e.g. "nepal".
@@ -118,14 +129,20 @@ def register_tools(mcp: FastMCP):
                     "Bank statements should show funds held 3-6 months.",
                     "Loan sanction letters from approved banks accepted.",
                     "Scholarship letters reduce proof required."],
-                "currency":"AUD"}
+                "currency":"AUD",
+                "data_freshness": datetime.now().isoformat()
+            }
         except Exception as e:
             log.error("tool_error",tool="calculate_financial_proof",error=str(e))
             return {"error":"Failed to calculate financial proof.","error_type":"tool_error"}
 
     @mcp.tool()
+    @log_search("get_visa_checklist")
     async def get_visa_checklist(nationality:str, destination_country:str) -> dict[str,Any]:
         """Get complete document checklist for student visa application.
+        Use when student asks what documents they need to prepare, or what the paperwork looks like.
+        Do not use for calculating financial amounts.
+
         Each document has description and whether mandatory or recommended.
         Args:
             nationality: e.g. "nepal".
@@ -153,15 +170,21 @@ def register_tools(mcp: FastMCP):
                 "required_documents":req,"recommended_documents":rec,
                 "total_required":len(req),"total_recommended":len(rec),
                 "tips":["Get all docs certified/notarized","Non-English docs need certified translations",
-                    "Keep originals and copies","Start gathering 2+ months before application"]}
+                    "Keep originals and copies","Start gathering 2+ months before application"],
+                "data_freshness": datetime.now().isoformat()
+            }
         except Exception as e:
             log.error("tool_error",tool="get_visa_checklist",error=str(e))
             return {"error":"Failed to get checklist.","error_type":"tool_error"}
 
     @mcp.tool()
+    @log_search("get_processing_timeline")
     async def get_processing_timeline(nationality:str, destination_country:str,
             course_start_date:str) -> dict[str,Any]:
         """Get recommended visa application timeline working backward from course start.
+        Use when student asks when they should start applying, or timeline for their intake.
+        Do not use for checking document checklist.
+
         Args:
             nationality: e.g. "nepal".
             destination_country: e.g. "australia".
@@ -202,12 +225,15 @@ def register_tools(mcp: FastMCP):
             overdue = sum(1 for t in timeline if t["status"]=="overdue")
             return {"course_start_date":course_start_date,"days_until_start":(start-today).days,
                 "timeline":timeline,"overdue_steps":overdue,"is_high_scrutiny":hs,
-                "warning":f"⚠️ {overdue} steps past deadline. Expedite!" if overdue else None}
+                "warning":f"⚠️ {overdue} steps past deadline. Expedite!" if overdue else None,
+                "data_freshness": datetime.now().isoformat()
+            }
         except Exception as e:
             log.error("tool_error",tool="get_processing_timeline",error=str(e))
             return {"error":"Failed to generate timeline.","error_type":"tool_error"}
 
     @mcp.tool()
+    @log_search("assess_visa_strength")
     async def assess_visa_strength(nationality:str, destination_country:str, age:int,
             has_financial_proof:bool, financial_amount_aud:float, annual_tuition_aud:float,
             course_duration_months:int, has_ielts:bool, ielts_score:Optional[float]=None,
@@ -215,6 +241,9 @@ def register_tools(mcp: FastMCP):
             has_family_property:bool=False, is_employed:bool=False,
             gap_years_after_study:int=0, study_level:str="postgraduate") -> dict[str,Any]:
         """Assess visa application strength with detailed scoring and improvement advice.
+        Use when student provides their full profile and asks if they will get the visa.
+        Do not use for general visa requirements without student profile.
+
         Evaluates financials, English, home ties, academic profile, and risk factors.
         Nepal-specific: includes detailed GTE advice, common refusal reasons, financial tips.
         Args:
@@ -306,6 +335,7 @@ def register_tools(mcp: FastMCP):
                         "Include Lalpurja (land certificate) as extra evidence",
                         "Education loan sanction from recognized Nepali bank",
                         "Remittance receipts if family works abroad"]}
+            result["data_freshness"] = datetime.now().isoformat()
             return result
         except Exception as e:
             log.error("tool_error",tool="assess_visa_strength",error=str(e))
