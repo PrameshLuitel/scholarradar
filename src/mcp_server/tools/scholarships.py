@@ -37,7 +37,7 @@ def _fetch_active_scholarships(
     funding_type: Optional[str] = None,
     university: Optional[str] = None,
     source_filter: str = "idp",
-, source_filter=source_filter) -> list[dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Fetch active scholarships from Supabase with optional exact-match filters."""
     db = _get_db()
     query = db.table("scholarships").select("*").eq("is_active", True)

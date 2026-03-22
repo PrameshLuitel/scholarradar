@@ -45,7 +45,7 @@ def _fetch_active_courses(
     level: Optional[str] = None,
     university: Optional[str] = None,
     source_filter: str = "idp",
-, source_filter=source_filter) -> list[dict[str, Any]]:
+) -> list[dict[str, Any]]:
     db = _get_db()
     query = db.table("courses").select("*").eq("is_active", True)
     if country:
