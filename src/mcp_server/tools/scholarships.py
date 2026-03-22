@@ -36,7 +36,8 @@ def _fetch_active_scholarships(
     study_level: Optional[str] = None,
     funding_type: Optional[str] = None,
     university: Optional[str] = None,
-) -> list[dict[str, Any]]:
+    source_filter: str = "idp",
+, source_filter=source_filter) -> list[dict[str, Any]]:
     """Fetch active scholarships from Supabase with optional exact-match filters."""
     db = _get_db()
     query = db.table("scholarships").select("*").eq("is_active", True)
@@ -48,6 +49,13 @@ def _fetch_active_scholarships(
         query = query.ilike("funding_type", funding_type.strip())
     if university:
         query = query.ilike("university", f"%{university.strip()}%")
+
+    if source_filter == "idp":
+        query = query.eq("source", "idp")
+    elif source_filter == "all":
+        pass
+    elif source_filter == "government":
+        query = query.in_("source", ["australia_awards", "rtp", "state_govt", "university_direct"])
     response = query.execute()
     data: list[dict[str, Any]] = response.data or []
     return data
@@ -163,6 +171,7 @@ def register_tools(mcp: FastMCP):
         min_value_aud: Optional[float] = None,
         deadline_after: Optional[str] = None,
         funding_type: Optional[str] = None,
+        source_filter: str = "idp",
     ) -> dict[str, Any]:
         """Search for scholarships available to students of a given nationality.
         Use when student wants to search for scholarships by subject, value, or funding type.
@@ -180,6 +189,9 @@ def register_tools(mcp: FastMCP):
             min_value_aud: Minimum scholarship value in AUD. Only returns awards >= this amount.
             deadline_after: ISO date string (YYYY-MM-DD). Only returns scholarships with deadlines after this date.
             funding_type: One of: "full", "partial", "fee_waiver", "stipend", "accommodation".
+                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
+                'government' returns government scholarships.
+                'all' returns everything.
         """
         try:
             log.info("tool_call", tool="search_scholarships", parameters={
@@ -193,6 +205,7 @@ def register_tools(mcp: FastMCP):
                 country=destination_country,
                 study_level=study_level,
                 funding_type=funding_type,
+                source_filter=source_filter,
             )
 
             if not rows:
@@ -310,6 +323,7 @@ def register_tools(mcp: FastMCP):
         target_country: str,
         ielts_score: float,
         gpa: Optional[float] = None,
+        source_filter: str = "idp",
     ) -> dict[str, Any]:
         """Find the top 10 scholarships that best match a specific student profile.
         Use when a student provides their full profile (GPA, IELTS, qualification) and asks what they qualify for.
@@ -325,6 +339,9 @@ def register_tools(mcp: FastMCP):
             target_country: Country they want to study in, e.g. "australia", "uk".
             ielts_score: Student's overall IELTS band score (e.g. 7.0).
             gpa: Student's GPA on a 4.0 scale (optional).
+                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
+                'government' returns government scholarships.
+                'all' returns everything.
         """
         try:
             log.info("tool_call", tool="match_profile", parameters={
@@ -343,7 +360,7 @@ def register_tools(mcp: FastMCP):
             elif any(k in qual_lower for k in ("master", "msc", "ma ", "mba", "meng")):
                 inferred_level = "doctorate"
 
-            rows = _fetch_active_scholarships(country=target_country)
+            rows = _fetch_active_scholarships(country=target_country, source_filter=source_filter)
 
             if not rows:
                 return _empty_result(
@@ -495,6 +512,7 @@ def register_tools(mcp: FastMCP):
     async def get_closing_soon(
         days: int = 30,
         destination_country: Optional[str] = None,
+        source_filter: str = "idp",
     ) -> dict[str, Any]:
         """Get scholarships with deadlines closing within the next N days.
         Use when student asks about urgent deadlines, scholarships closing soon, last chance funding, or time-sensitive opportunities.
@@ -506,13 +524,16 @@ def register_tools(mcp: FastMCP):
         Args:
             days: Number of days to look ahead (default 30). E.g. 14 for next two weeks.
             destination_country: Optional country filter, e.g. "australia", "canada".
+                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
+                'government' returns government scholarships.
+                'all' returns everything.
         """
         try:
             log.info("tool_call", tool="get_closing_soon", parameters={
                 "days": days, "destination_country": destination_country,
             })
 
-            rows = _fetch_active_scholarships(country=destination_country)
+            rows = _fetch_active_scholarships(country=destination_country, source_filter=source_filter)
             today = date.today()
             cutoff = today + timedelta(days=days)
 
@@ -566,6 +587,7 @@ def register_tools(mcp: FastMCP):
     async def get_fully_funded(
         destination_country: str,
         study_level: Optional[str] = None,
+        source_filter: str = "idp",
     ) -> dict[str, Any]:
         """Get only fully-funded scholarships that cover full tuition and living expenses.
         Use when student asks for full scholarships, complete funding, free education, or scholarships that cover all expenses.
@@ -577,6 +599,9 @@ def register_tools(mcp: FastMCP):
         Args:
             destination_country: Country where the scholarship is offered, e.g. "australia".
             study_level: Optional level filter: foundation, undergraduate, postgraduate, doctorate.
+                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
+                'government' returns government scholarships.
+                'all' returns everything.
         """
         try:
             log.info("tool_call", tool="get_fully_funded", parameters={
@@ -587,6 +612,7 @@ def register_tools(mcp: FastMCP):
                 country=destination_country,
                 study_level=study_level,
                 funding_type="full",
+                source_filter=source_filter,
             )
 
             if not rows:
@@ -627,6 +653,7 @@ def register_tools(mcp: FastMCP):
         limit: int = 20,
         study_level: Optional[str] = None,
         funding_type: Optional[str] = None,
+        source_filter: str = "idp",
     ) -> dict[str, Any]:
         """Get scholarships offered by a specific university.
         Use when student asks about scholarships at a specific institution, like 'funding at Melbourne Uni'.
@@ -640,6 +667,9 @@ def register_tools(mcp: FastMCP):
             limit: Number of results to return (max 50).
             study_level: Optional level filter: foundation, undergraduate, postgraduate, doctorate.
             funding_type: Optional: full, partial, fee_waiver, stipend, accommodation.
+                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
+                'government' returns government scholarships.
+                'all' returns everything.
         """
         try:
             safe_limit = min(max(1, limit), 50)
@@ -651,6 +681,13 @@ def register_tools(mcp: FastMCP):
             db = _get_db()
             query = db.table("scholarships").select("*").eq("is_active", True).ilike("university", f"%{university_name}%")
             
+            if source_filter == "idp":
+                query = query.eq("source", "idp")
+            elif source_filter == "all":
+                pass
+            elif source_filter == "government":
+                query = query.in_("source", ["australia_awards", "rtp", "state_govt", "university_direct"])
+
             if study_level:
                 query = query.ilike("study_level", study_level.strip())
             if funding_type:
@@ -712,6 +749,7 @@ def register_tools(mcp: FastMCP):
         country1: str,
         country2: str,
         study_level: str,
+        source_filter: str = "idp",
     ) -> dict[str, Any]:
         """Compare scholarship availability between two countries side by side.
         Use when student is deciding between two countries and wants to know which has better funding opportunities.
@@ -725,6 +763,9 @@ def register_tools(mcp: FastMCP):
             country1: First country to compare, e.g. "australia".
             country2: Second country to compare, e.g. "uk".
             study_level: Study level: foundation, undergraduate, postgraduate, doctorate.
+                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
+                'government' returns government scholarships.
+                'all' returns everything.
         """
         try:
             log.info("tool_call", tool="compare_scholarship_options", parameters={
@@ -787,8 +828,8 @@ def register_tools(mcp: FastMCP):
                     "top_scholarships": [_scholarship_summary(s) for s in top_3],
                 }
 
-            rows1 = _fetch_active_scholarships(country=country1, study_level=study_level)
-            rows2 = _fetch_active_scholarships(country=country2, study_level=study_level)
+            rows1 = _fetch_active_scholarships(country=country1, study_level=study_level, source_filter=source_filter)
+            rows2 = _fetch_active_scholarships(country=country2, study_level=study_level, source_filter=source_filter)
 
             analysis1 = _analyze_country(rows1, country1)
             analysis2 = _analyze_country(rows2, country2)
@@ -829,6 +870,7 @@ def register_tools(mcp: FastMCP):
     async def get_scholarship_statistics(
         destination_country: str,
         nationality: str,
+        source_filter: str = "idp",
     ) -> dict[str, Any]:
         """Get aggregated statistics about available scholarships for a country.
         Use when student wants to understand the overall funding landscape before deep diving.
@@ -840,13 +882,16 @@ def register_tools(mcp: FastMCP):
         Args:
             destination_country: Country to analyze, e.g. "australia", "uk".
             nationality: Student's nationality to check eligibility counts, e.g. "nepalese".
+                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
+                'government' returns government scholarships.
+                'all' returns everything.
         """
         try:
             log.info("tool_call", tool="get_scholarship_statistics", parameters={
                 "destination_country": destination_country, "nationality": nationality,
             })
 
-            rows = _fetch_active_scholarships(country=destination_country)
+            rows = _fetch_active_scholarships(country=destination_country, source_filter=source_filter)
 
             if not rows:
                 return _empty_result(
@@ -951,6 +996,7 @@ def register_tools(mcp: FastMCP):
         min_value_aud: float,
         destination_country: Optional[str] = None,
         nationality: str = "nepalese",
+        source_filter: str = "idp",
     ) -> dict[str, Any]:
         """Find scholarships above a specified minimum dollar value.
         Use when student specifies they need at least X amount in funding, or asks for the most valuable scholarships available.
@@ -963,6 +1009,9 @@ def register_tools(mcp: FastMCP):
             min_value_aud: Minimum scholarship value in AUD.
             destination_country: Optional country filter, e.g. "australia", "uk".
             nationality: Student's nationality for eligibility check.
+                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
+                'government' returns government scholarships.
+                'all' returns everything.
         """
         try:
             log.info("tool_call", tool="get_scholarships_by_value", parameters={
@@ -970,7 +1019,7 @@ def register_tools(mcp: FastMCP):
                 "nationality": nationality,
             })
 
-            rows = _fetch_active_scholarships(country=destination_country)
+            rows = _fetch_active_scholarships(country=destination_country, source_filter=source_filter)
             if not rows:
                 return _empty_result(f"No scholarships found in {destination_country or 'any country'}.")
 
@@ -1019,6 +1068,7 @@ def register_tools(mcp: FastMCP):
         nationality: str,
         destination_country: Optional[str] = None,
         days_back: int = 7,
+        source_filter: str = "idp",
     ) -> dict[str, Any]:
         """Find recently added scholarships in the database.
         Use when student asks what new scholarships are available, fresh opportunities, or recently opened applications.
@@ -1028,6 +1078,9 @@ def register_tools(mcp: FastMCP):
             nationality: Student's nationality for eligibility check.
             destination_country: Optional country filter, e.g. "australia".
             days_back: Number of days to look back for newly added records (default 7).
+                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
+                'government' returns government scholarships.
+                'all' returns everything.
         """
         try:
             log.info("tool_call", tool="get_new_scholarships", parameters={

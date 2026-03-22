@@ -44,7 +44,8 @@ def _fetch_active_courses(
     country: Optional[str] = None,
     level: Optional[str] = None,
     university: Optional[str] = None,
-) -> list[dict[str, Any]]:
+    source_filter: str = "idp",
+, source_filter=source_filter) -> list[dict[str, Any]]:
     db = _get_db()
     query = db.table("courses").select("*").eq("is_active", True)
     if country:
@@ -53,6 +54,13 @@ def _fetch_active_courses(
         query = query.ilike("level", level.strip())
     if university:
         query = query.ilike("university", f"%{university.strip()}%")
+
+    if source_filter == "idp":
+        query = query.eq("source", "idp")
+    elif source_filter == "all":
+        pass
+    elif source_filter == "government":
+        query = query.in_("source", ["australia_awards", "rtp", "state_govt", "university_direct"])
     response = query.execute()
     return response.data or []
 
@@ -136,6 +144,7 @@ def register_tools(mcp: FastMCP):
         max_tuition_aud: Optional[float] = None,
         max_duration_months: Optional[int] = None,
         min_ielts: Optional[float] = None,
+        source_filter: str = "idp",
     ) -> dict[str, Any]:
         """Search for courses by subject, country, and study level with optional filters.
         Use when student asks about courses to study, what programs are available, which universities offer a specific degree, or what to study in a country.
@@ -151,6 +160,9 @@ def register_tools(mcp: FastMCP):
             max_tuition_aud: Maximum annual tuition fee in local currency. Only returns courses under this.
             max_duration_months: Maximum course duration in months. E.g. 24 for 2-year programs.
             min_ielts: Minimum IELTS score the student has. Returns courses they qualify for.
+                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
+                'government' returns government scholarships.
+                'all' returns everything.
         """
         try:
             log.info("tool_call", tool="search_courses", parameters={
@@ -159,7 +171,7 @@ def register_tools(mcp: FastMCP):
                 "max_duration_months": max_duration_months, "min_ielts": min_ielts,
             })
 
-            rows = _fetch_active_courses(country=destination_country, level=study_level)
+            rows = _fetch_active_courses(country=destination_country, level=study_level, source_filter=source_filter)
 
             if not rows:
                 return _empty_result(
@@ -235,6 +247,7 @@ def register_tools(mcp: FastMCP):
         university1: str,
         course2_name: str,
         university2: str,
+        source_filter: str = "idp",
     ) -> dict[str, Any]:
         """Compare two specific courses side by side.
         Use when student is deciding between two programs or universities and wants a direct comparison.
@@ -248,6 +261,9 @@ def register_tools(mcp: FastMCP):
             university1: University offering the first course, e.g. "University of Melbourne".
             course2_name: Name or partial name of the second course, e.g. "MSc Computer Science".
             university2: University offering the second course, e.g. "University of Sydney".
+                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
+                'government' returns government scholarships.
+                'all' returns everything.
         """
         try:
             log.info("tool_call", tool="compare_courses", parameters={
@@ -256,7 +272,7 @@ def register_tools(mcp: FastMCP):
             })
 
             def _find_best_match(name: str, university: str) -> Optional[dict]:
-                rows = _fetch_active_courses(university=university)
+                rows = _fetch_active_courses(university=university, source_filter=source_filter)
                 if not rows:
                     return None
                 best_score, best = 0.0, None
@@ -335,6 +351,7 @@ def register_tools(mcp: FastMCP):
         ielts_score: float,
         budget_aud_per_year: float,
         destination_country: Optional[str] = None,
+        source_filter: str = "idp",
     ) -> dict[str, Any]:
         """Find courses a student can actually get into based on their profile.
         Use when student wants to know which courses they qualify for right now, or what is realistic given their scores.
@@ -350,6 +367,9 @@ def register_tools(mcp: FastMCP):
             ielts_score: Student's overall IELTS band score (e.g. 6.5).
             budget_aud_per_year: Maximum annual tuition budget in local currency.
             destination_country: Optional country filter, e.g. "australia".
+                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
+                'government' returns government scholarships.
+                'all' returns everything.
         """
         try:
             log.info("tool_call", tool="find_courses_for_profile", parameters={
@@ -370,7 +390,7 @@ def register_tools(mcp: FastMCP):
             elif any(k in qual_lower for k in ("master", "msc", "ma ", "mba")):
                 inferred_level = "doctorate"
 
-            rows = _fetch_active_courses(country=destination_country, level=inferred_level)
+            rows = _fetch_active_courses(country=destination_country, level=inferred_level, source_filter=source_filter)
 
             if not rows:
                 return _empty_result(
@@ -478,6 +498,7 @@ def register_tools(mcp: FastMCP):
         current_qualification: str,
         target_degree: str,
         target_university: str,
+        source_filter: str = "idp",
     ) -> dict[str, Any]:
         """Find foundation and pathway courses that lead to a target degree program.
         Use when student doesn't meet entry requirements, needs a bridge program, or asks about foundation years.
@@ -491,6 +512,9 @@ def register_tools(mcp: FastMCP):
             current_qualification: What the student currently holds, e.g. "high school diploma".
             target_degree: The degree they ultimately want, e.g. "Bachelor of Engineering".
             target_university: University they want to attend, e.g. "University of Sydney".
+                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
+                'government' returns government scholarships.
+                'all' returns everything.
         """
         try:
             log.info("tool_call", tool="get_pathway_options", parameters={
@@ -500,7 +524,7 @@ def register_tools(mcp: FastMCP):
             })
 
             # Search for foundation/pathway courses at the target university
-            all_courses = _fetch_active_courses(university=target_university)
+            all_courses = _fetch_active_courses(university=target_university, source_filter=source_filter)
 
             pathway_courses = []
             degree_courses = []
@@ -567,6 +591,7 @@ def register_tools(mcp: FastMCP):
         ielts_score: float,
         destination_country: str,
         study_level: str,
+        source_filter: str = "idp",
     ) -> dict[str, Any]:
         """Find all courses where the student's IELTS score meets the requirement.
         Use when student asks what they can study with their IELTS score, or how many courses their score unlocks.
@@ -579,6 +604,9 @@ def register_tools(mcp: FastMCP):
             ielts_score: Student's overall IELTS band score (e.g. 6.5).
             destination_country: Country to search in, e.g. "australia".
             study_level: One of: foundation, undergraduate, postgraduate, doctorate.
+                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
+                'government' returns government scholarships.
+                'all' returns everything.
         """
         try:
             log.info("tool_call", tool="get_courses_by_ielts", parameters={
@@ -586,7 +614,7 @@ def register_tools(mcp: FastMCP):
                 "study_level": study_level,
             })
 
-            rows = _fetch_active_courses(country=destination_country, level=study_level)
+            rows = _fetch_active_courses(country=destination_country, level=study_level, source_filter=source_filter)
 
             if not rows:
                 return _empty_result(
