@@ -65,6 +65,10 @@ app = FastAPI(
 app.include_router(analytics_router)
 app.include_router(dashboard_router)
 
+@app.get("/test_dash")
+async def test_dash():
+    return {"message": "dashboard router is active"}
+
 # 5. CORS Middlewares
 app.add_middleware(
     CORSMiddleware,
