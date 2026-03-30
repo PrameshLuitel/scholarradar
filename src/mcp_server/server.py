@@ -61,13 +61,10 @@ app = FastAPI(
     lifespan=combined_lifespan
 )
 
-# 4.5 Include Analytics Endpoints
-app.include_router(analytics_router)
-app.include_router(dashboard_router)
-
-@app.get("/test_dash")
-async def test_dash():
-    return {"message": "dashboard router is active"}
+# 4.5 Include Analytics and Dashboard Endpoints directly to mcp_app
+# This ensures they are properly handled by the mcp_app mounted at /
+mcp_app.include_router(analytics_router)
+mcp_app.include_router(dashboard_router)
 
 # 5. CORS Middlewares
 app.add_middleware(
