@@ -3,7 +3,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 from typing import Any, List
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import FastAPI, Depends, HTTPException, Header
 from structlog import get_logger
 
 from src.database.client import get_db
@@ -18,13 +18,12 @@ async def verify_analytics_key(x_analytics_key: str = Header(None)):
         raise HTTPException(status_code=403, detail="Invalid Analytics API Key")
     return x_analytics_key
 
-router = APIRouter(
-    prefix="/analytics",
-    tags=["analytics"],
+app = FastAPI(
+    title="ScholarRadar Analytics",
     dependencies=[Depends(verify_analytics_key)]
 )
 
-@router.get("/overview")
+@app.get("/overview")
 async def get_overview() -> dict[str, Any]:
     db = get_db()
     now = datetime.utcnow()
@@ -87,7 +86,7 @@ async def get_overview() -> dict[str, Any]:
         log.error("analytics_overview_error", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to load overview.")
 
-@router.get("/gaps")
+@app.get("/gaps")
 async def get_gaps() -> dict[str, Any]:
     db = get_db()
     try:
@@ -118,7 +117,7 @@ async def get_gaps() -> dict[str, Any]:
         log.error("analytics_gaps_error", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to load gaps.")
 
-@router.get("/realtime")
+@app.get("/realtime")
 async def get_realtime() -> dict[str, Any]:
     db = get_db()
     try:

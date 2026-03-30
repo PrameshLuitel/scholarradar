@@ -8,7 +8,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 from structlog import get_logger
 
@@ -16,12 +16,12 @@ from src.database.client import get_db
 
 log = get_logger("api.dashboard")
 
-router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+app = FastAPI(title="ScholarRadar Dashboard")
 
 
 # ── JSON Data Endpoint ─────────────────────────────────────────────────────
 
-@router.get("/data")
+@app.get("/data")
 async def dashboard_data() -> dict[str, Any]:
     """Public JSON endpoint with aggregated analytics — no auth required."""
     db = get_db()
@@ -120,7 +120,7 @@ async def dashboard_data() -> dict[str, Any]:
 
 # ── HTML Dashboard ─────────────────────────────────────────────────────────
 
-@router.get("", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
 async def dashboard_page():
     """Render a beautiful, self-contained analytics dashboard — no auth."""
     return HTMLResponse(content=DASHBOARD_HTML)

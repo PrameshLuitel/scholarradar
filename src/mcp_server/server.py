@@ -42,8 +42,6 @@ register_counsellor(mcp)
 mcp_app = mcp.http_app()
 
 import contextlib
-from src.api.analytics import router as analytics_router
-from src.api.dashboard import router as dashboard_router
 
 @contextlib.asynccontextmanager
 async def combined_lifespan(app: FastAPI):
@@ -62,9 +60,12 @@ app = FastAPI(
 )
 
 # 4.5 Include Analytics and Dashboard Endpoints directly to mcp_app
-# This ensures they are properly handled by the mcp_app mounted at /
-mcp_app.include_router(analytics_router)
-mcp_app.include_router(dashboard_router)
+# Using Starlette-compatible .mount() because mcp_app is a Starlette instance
+from src.api.analytics import app as analytics_app
+from src.api.dashboard import app as dashboard_app
+
+mcp_app.mount("/analytics", analytics_app)
+mcp_app.mount("/dashboard", dashboard_app)
 
 # 5. CORS Middlewares
 app.add_middleware(
