@@ -136,18 +136,18 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#0a0e1a;--card:#111827;--border:#1e293b;
-  --text:#e2e8f0;--muted:#94a3b8;--accent:#6366f1;
-  --accent2:#8b5cf6;--green:#10b981;--amber:#f59e0b;
-  --red:#ef4444;--cyan:#06b6d4;
+  --bg:#0f172a;--card:#1e293b;--border:#334155;
+  --text:#f8fafc;--muted:#94a3b8;--accent:#0072bc;
+  --accent2:#f7941e;--green:#00a651;--amber:#f59e0b;
+  --red:#ef4444;--cyan:#0ea5e9;
 }
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:0}
-.header{background:linear-gradient(135deg,#1e1b4b 0%,#0f172a 50%,#0c1220 100%);
+.header{background:linear-gradient(135deg,#003152 0%,#0072bc 50%,#0f172a 100%);
   padding:2.5rem 2rem;border-bottom:1px solid var(--border);text-align:center;position:relative;overflow:hidden}
 .header::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;
-  background:radial-gradient(circle at 30% 50%,rgba(99,102,241,0.08) 0%,transparent 50%);pointer-events:none}
+  background:radial-gradient(circle at 30% 50%,rgba(0,114,188,0.1) 0%,transparent 50%);pointer-events:none}
 .header h1{font-size:2rem;font-weight:800;
-  background:linear-gradient(135deg,#818cf8,#c084fc,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background:linear-gradient(135deg,#ffffff,#cbd5e1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;
   letter-spacing:-0.5px;margin-bottom:0.25rem;position:relative}
 .header p{color:var(--muted);font-size:0.95rem;position:relative}
 .header .badge{display:inline-flex;align-items:center;gap:6px;margin-top:0.75rem;padding:4px 12px;
@@ -174,11 +174,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar-track{flex:1;height:24px;background:#1e293b;border-radius:6px;overflow:hidden;position:relative}
 .bar-fill{height:100%;border-radius:6px;transition:width 1s ease;position:relative;min-width:2px}
-.bar-fill.purple{background:linear-gradient(90deg,#6366f1,#8b5cf6)}
-.bar-fill.cyan{background:linear-gradient(90deg,#06b6d4,#22d3ee)}
-.bar-fill.green{background:linear-gradient(90deg,#10b981,#34d399)}
-.bar-fill.amber{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
-.bar-fill.rose{background:linear-gradient(90deg,#f43f5e,#fb7185)}
+.bar-fill.purple{background:linear-gradient(90deg,var(--accent),#3b82f6)}
+.bar-fill.cyan{background:linear-gradient(90deg,var(--accent2),#fb923c)}
+.bar-fill.green{background:linear-gradient(90deg,var(--green),#22c55e)}
+.bar-fill.amber{background:linear-gradient(90deg,var(--amber),#fbbf24)}
+.bar-fill.rose{background:linear-gradient(90deg,var(--red),#f87171)}
 .bar-count{font-size:0.75rem;color:var(--muted);width:40px;text-align:right;flex-shrink:0}
 .feed-table{width:100%;border-collapse:collapse}
 .feed-table th{font-size:0.65rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);
@@ -223,7 +223,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <div class="footer">
   <p>Built by <strong>Pramesh Luitel</strong> · ScholarRadar MCP · <a href="/mcp">Connect via MCP</a></p>
-  <p style="margin-top:4px">Every link in this system routes students to <strong>idp.com</strong></p>
+  <p style="margin-top:4px">Data sourced live from <strong>Supabase tool_call_logs</strong> via MCP instrumentation</p>
+  <p style="margin-top:4px; opacity: 0.8; font-size: 0.65rem">All student leads are routed directly to <strong>idp.com</strong> domains</p>
 </div>
 
 <script>
