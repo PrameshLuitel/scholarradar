@@ -55,12 +55,9 @@ def _fetch_active_courses(
     if university:
         query = query.ilike("university", f"%{university.strip()}%")
 
-    if source_filter == "idp":
-        query = query.eq("source", "idp")
-    elif source_filter == "all":
-        pass
-    elif source_filter == "government":
-        query = query.in_("source", ["australia_awards", "rtp", "state_govt", "university_direct"])
+    # The courses table does not have a 'source' column.
+    # We default to showing all active courses.
+    pass
     response = query.execute()
     return response.data or []
 
@@ -162,15 +159,14 @@ Search for courses by subject, country, and study level with optional filters.
             max_tuition_aud: Maximum annual tuition fee in local currency. Only returns courses under this.
             max_duration_months: Maximum course duration in months. E.g. 24 for 2-year programs.
             min_ielts: Minimum IELTS score the student has. Returns courses they qualify for.
-                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
-                'government' returns government scholarships.
-                'all' returns everything.
+            source_filter: 'idp' (default) returns only IDP-sourced courses. 'all' returns everything.
         """
         try:
             log.info("tool_call", tool="search_courses", parameters={
                 "subject": subject, "destination_country": destination_country,
                 "study_level": study_level, "max_tuition_aud": max_tuition_aud,
                 "max_duration_months": max_duration_months, "min_ielts": min_ielts,
+                "source_filter": source_filter,
             })
 
             rows = _fetch_active_courses(country=destination_country, level=study_level, source_filter=source_filter)
@@ -261,18 +257,17 @@ Compare two specific courses side by side.
         entry qualifications, location, and start dates.
 
         Args:
-            course1_name: Name or partial name of the first course, e.g. "Master of Data Science".
-            university1: University offering the first course, e.g. "University of Melbourne".
-            course2_name: Name or partial name of the second course, e.g. "MSc Computer Science".
-            university2: University offering the second course, e.g. "University of Sydney".
-                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
-                'government' returns government scholarships.
-                'all' returns everything.
+            source_1_name: Name of the first course.
+            university1: University for the first course.
+            source_2_name: Name of the second course.
+            university2: University for the second course.
+            source_filter: 'idp' (default) returns only IDP-sourced courses. 'all' returns everything.
         """
         try:
             log.info("tool_call", tool="compare_courses", parameters={
                 "course1_name": course1_name, "university1": university1,
                 "course2_name": course2_name, "university2": university2,
+                "source_filter": source_filter,
             })
 
             def _find_best_match(name: str, university: str) -> Optional[dict]:
@@ -373,9 +368,7 @@ Find courses a student can actually get into based on their profile.
             ielts_score: Student's overall IELTS band score (e.g. 6.5).
             budget_aud_per_year: Maximum annual tuition budget in local currency.
             destination_country: Optional country filter, e.g. "australia".
-                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
-                'government' returns government scholarships.
-                'all' returns everything.
+            source_filter: 'idp' (default) returns only IDP-sourced courses. 'all' returns everything.
         """
         try:
             log.info("tool_call", tool="find_courses_for_profile", parameters={
@@ -384,6 +377,7 @@ Find courses a student can actually get into based on their profile.
                 "ielts_score": ielts_score,
                 "budget_aud_per_year": budget_aud_per_year,
                 "destination_country": destination_country,
+                "source_filter": source_filter,
             })
 
             # Infer study level
@@ -520,15 +514,14 @@ Find foundation and pathway courses that lead to a target degree program.
             current_qualification: What the student currently holds, e.g. "high school diploma".
             target_degree: The degree they ultimately want, e.g. "Bachelor of Engineering".
             target_university: University they want to attend, e.g. "University of Sydney".
-                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
-                'government' returns government scholarships.
-                'all' returns everything.
+            source_filter: 'idp' (default) returns only IDP-sourced courses. 'all' returns everything.
         """
         try:
             log.info("tool_call", tool="get_pathway_options", parameters={
                 "current_qualification": current_qualification,
                 "target_degree": target_degree,
                 "target_university": target_university,
+                "source_filter": source_filter,
             })
 
             # Search for foundation/pathway courses at the target university
@@ -614,14 +607,12 @@ Find all courses where the student's IELTS score meets the requirement.
             ielts_score: Student's overall IELTS band score (e.g. 6.5).
             destination_country: Country to search in, e.g. "australia".
             study_level: One of: foundation, undergraduate, postgraduate, doctorate.
-                    source_filter: 'idp' (default) returns only IDP-sourced scholarships with idp.com links.
-                'government' returns government scholarships.
-                'all' returns everything.
+            source_filter: 'idp' (default) returns only IDP-sourced courses. 'all' returns everything.
         """
         try:
             log.info("tool_call", tool="get_courses_by_ielts", parameters={
                 "ielts_score": ielts_score, "destination_country": destination_country,
-                "study_level": study_level,
+                "study_level": study_level, "source_filter": source_filter,
             })
 
             rows = _fetch_active_courses(country=destination_country, level=study_level, source_filter=source_filter)
