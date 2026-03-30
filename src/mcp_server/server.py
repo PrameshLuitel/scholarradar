@@ -43,6 +43,7 @@ mcp_app = mcp.http_app()
 
 import contextlib
 from src.api.analytics import router as analytics_router
+from src.api.dashboard import router as dashboard_router
 
 @contextlib.asynccontextmanager
 async def combined_lifespan(app: FastAPI):
@@ -62,6 +63,7 @@ app = FastAPI(
 
 # 4.5 Include Analytics Endpoints
 app.include_router(analytics_router)
+app.include_router(dashboard_router)
 
 # 5. CORS Middlewares
 app.add_middleware(
