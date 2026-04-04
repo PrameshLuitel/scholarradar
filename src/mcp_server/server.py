@@ -95,28 +95,33 @@ app.mount("/mcp", mcp_app)
 
 # 8. Serve Frontend Static Files
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi import Request
 import os
 
 frontend_dist = os.path.join(os.path.dirname(__file__), "../../frontend/dist")
 
-if os.path.exists(frontend_dist):
+try:
     app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
+except Exception as e:
+    log.warning("frontend_assets_missing", error=str(e))
     
-    # Catch-all route to serve the SPA index.html for unknown paths (e.g. React Router)
-    @app.api_route("/{full_path:path}", methods=["GET"])
-    async def serve_frontend(request: Request, full_path: str):
-        # Allow API routes to 404 naturally if they don't exist
-        if full_path.startswith("mcp/") or full_path.startswith("health") or full_path.startswith("analytics/") or full_path.startswith("dashboard/"):
-            from starlette.exceptions import HTTPException
-            raise HTTPException(status_code=404, detail="Not Found")
-            
-        file_path = os.path.join(frontend_dist, full_path)
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
+# Catch-all route to serve the SPA index.html for unknown paths (e.g. React Router)
+@app.api_route("/{full_path:path}", methods=["GET"])
+async def serve_frontend(request: Request, full_path: str):
+    # Allow API routes to 404 naturally if they don't exist
+    if full_path.startswith("mcp/") or full_path.startswith("health") or full_path.startswith("analytics/") or full_path.startswith("dashboard/"):
+        from starlette.exceptions import HTTPException
+        raise HTTPException(status_code=404, detail="Not Found")
         
-        return FileResponse(os.path.join(frontend_dist, "index.html"))
+    if not os.path.exists(frontend_dist):
+         return JSONResponse(status_code=500, content={"error": "Frontend build directory not found. Ensure 'npm run build' was executed."})
+
+    file_path = os.path.join(frontend_dist, full_path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+    
+    return FileResponse(os.path.join(frontend_dist, "index.html"))
 
 # 8. Entry Point
 if __name__ == "__main__":
