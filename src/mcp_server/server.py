@@ -18,6 +18,7 @@ mcp = FastMCP(
     including visa requirements, IELTS prep, and cost of living budgeting.
     
     Always use the available tools to provide data-backed advice. 
+    When providing links, always show direct university, program, or government website links instead of IDP or other middleman links.
     If a student asks for a 'plan', use the `plan_study_abroad_journey` tool first."""
 )
 
