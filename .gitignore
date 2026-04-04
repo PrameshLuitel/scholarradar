@@ -8,3 +8,7 @@ node_modules/
 *.egg-info
 dist/
 scraped_data/
+cv_updated.tex
+.course_scraper_checkpoint.json
+scrape_log.txt
+course_scrape.log

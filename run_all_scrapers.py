@@ -174,6 +174,24 @@ async def run_scholarships(progress):
     mark_done(progress, name, len(results), elapsed)
 
 
+async def run_phd_seeker(progress):
+    name = "phd_seeker"
+    if is_done(progress, name):
+        print(f"✅ {name} — already done, skipping")
+        return
+    print(f"\n{'='*60}")
+    print(f"🔄 PhD-Seeker Scholarships (~500-1000 records, ~5-10 min)")
+    print(f"{'='*60}")
+    t = time.time()
+    from src.scrapers.phd_seeker_scraper import PhDSeekerScraper
+    s = PhDSeekerScraper()
+    results = s.scrape()
+    elapsed = time.time() - t
+    save_json("phd_seeker.json", results)
+    print(f"✅ Done: {len(results)} records in {elapsed/60:.1f} min")
+    mark_done(progress, name, len(results), elapsed)
+
+
 async def run_courses(progress):
     name = "idp_courses"
     if is_done(progress, name):
@@ -208,7 +226,7 @@ async def main():
 
     completed_list = progress.get("completed", [])
     done_count = len(completed_list) if isinstance(completed_list, list) else 0
-    total_scrapers = 6
+    total_scrapers = 7
 
     print(f"🚀 ScholarRadar Full Scrape")
     print(f"   Output: {OUTPUT_DIR}/")
@@ -223,6 +241,7 @@ async def main():
         ("Government Scholarships", run_govt_scholarships),
         ("Visa Requirements", run_visa),
         ("Cost of Living", run_cost_of_living),
+        ("PhD-Seeker Scholarships", run_phd_seeker),
         ("IDP Universities", run_universities),
         ("IDP Scholarships", run_scholarships),
         ("IDP Courses", run_courses),

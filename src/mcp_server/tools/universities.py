@@ -71,7 +71,6 @@ def _uni_summary(u: dict[str, Any]) -> dict[str, Any]:
         "accommodation_cost_min": u.get("accommodation_cost_min"),
         "accommodation_cost_max": u.get("accommodation_cost_max"),
         "website": u.get("website"),
-        "idp_profile_url": u.get("idp_profile_url"),
         "data_freshness": str(u["updated_at"]) if u.get("updated_at") else None,
     }
 

@@ -1,0 +1,28 @@
+services:
+  # Web Service for the ScholarRadar MCP Server
+  - type: web
+    name: scholar-radar-mcp
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.mcp_server.server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+
+  # Background Worker for the ScholarRadar Scheduler (Daily Scrapers)
+  - type: worker
+    name: scholar-radar-scheduler
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m src.scheduler.jobs
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SLACK_WEBHOOK_URL
+        sync: false

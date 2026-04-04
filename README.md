@@ -15,6 +15,13 @@ Production-grade Python project for scraping and serving scholarship data via MC
 4. Run scrapers: `python src/scheduler/jobs.py`.
 5. Start MCP server: `python src/mcp_server/server.py`.
 
+## Deploy on Render
+For Render, use the existing `Procfile` to run both the web app and scheduler worker:
+- `web`: `uvicorn src.mcp_server.server:app --host 0.0.0.0 --port ${PORT:-10000}`
+- `worker`: `python -m src.scheduler.jobs`
+
+This worker runs the live daily scraper via `scrape_all_databases()` and keeps Supabase updated every 24 hours from startup.
+
 ## Analytics System
 The server includes a comprehensive analytics system that tracks all MCP tool usage. 
 You can access the analytics via the REST API endpoints:

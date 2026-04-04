@@ -1,0 +1,104 @@
+0.5.2 - 2025-03-12
+-- Move repository configurations to repo.yaml for better modularity.
+
+0.5.1 - 2025-03-08
+-- Add findaphd-eu
+
+0.5 - 2025-03-07
+-- Remove dependency on http3 to make it compatible with recent version of python.
+
+0.4.8 - 2025-03-07
+-- Freeze package versions, as some are deprecated and no longer work with newer versions of Python.
+
+0.4.7 - 2023-01-26
+-- fixed issue with no desired countries
+
+0.4.6 - 2023-01-12
+-- -c, --countries option to filter by country
+-- fixed issue with no desired countries announcement
+
+0.4.5 - 2022-09-13
+-- list of repositories will be shown under the -V option.
+
+0.4.4 - 2022-09-12
+-- new option --repolist, shows the list of repositories.
+
+0.4.3 - 2022-08-16
+-- Better output screen
+
+0.4.2 - 2022-08-12
+-- Better verbose mode
+
+0.4.1 - 2022-08-11
+-- Prints the number of saved records in the output files on the screen.
+
+0.4 - 2022-08-10
+-- Checks for the new update at each run automatically.
+
+0.3.14 - 2022-08-09
+-- output file renamed to `PhD_Positions_date[keywords].[csv/xlsx]`
+-- 2 sample output files removed from the repo
+
+0.3.13 - 2022-08-08
+-- fixed some issue with printing.
+-- prints out the name of output files.
+-- fixed the minimum version of python to 3.8 for PyPi because of using walrus operator
+
+0.3.12 - 2022-08-07
+-- Bettter ouptut.
+
+0.3.11 - 2022-08-06
+-- missing `openpyxl` as another dependency to write the output in the excel file
+
+0.3.10 - 2022-08-06
+-- http3.client.AsyncClient --> close()
+-- httpx._client.AsyncClient --> aclose()
+
+0.3.9 - 2022-08-06
+-- close the open client of http3/x
+
+0.3.8 - 2022-08-06
+-- Preparing PyPi package
+-- Filename change in compliance with setuptools confing
+
+0.3.7 - 2022-08-02
+-- Retouching the output screen.
+-- `rich` module is another new dependency.
+
+0.3.6 - 2022-08-02
+-- The output is show in a tabular format in verbose mode.
+
+0.3.5 - 2022-08-01
+-- Fixed issue with verbose mode as it needs not to show the `timedelta` column.
+
+0.3.4 - 2022-08-01
+-- Readme update
+-- fixed issue with the total number of sought positions
+
+0.3.3 - 2022-08-01
+-- Sorting by the name of country and the time of position ad
+
+0.3.2 - 2022-07-29
+-- asynchronous URLs fetch results in time saving
+-- Two new dependencies, http3 and httpx
+
+0.3.1 - 2022-07-28
+-- Printing the total time at the end
+
+0.3.0 - 2022-05-20
+-- Support command line version named phdseeker-cli
+
+0.2.1 - 2022-05-15
+-- Showing the number of sought positions for each repo
+
+0.2.0 - 2022-05-13
+-- Fully Object Oriented design
+-- page query to preset maxmimum page number
+
+0.1.2 - 2022-05-11
+-- Retouching the code to make it more concise
+-- Sorting the output
+-- Support for both CSV/XLSX output
+
+0.1.0 - 2022-05-09
+-- Initial release with support of two sites including scholarshipdb.net and findaphd.com

@@ -1,16 +1,14 @@
 """
-ScholarRadar Production Scheduler — 6 APScheduler jobs.
+ScholarRadar Production Scheduler — daily live scraper and maintenance jobs.
 
 Runs as a separate worker process alongside the MCP server.
 Start: python -m src.scheduler.jobs
 
 Jobs:
-  1. scrape_scholarships   — every 12 hours
-  2. scrape_courses         — every 48 hours
-  3. scrape_universities    — every 7 days
-  4. verify_urls            — every 24 hours
-  5. health_report          — every 6 hours
-  6. scholarship_alert      — every 12 hours
+  1. scrape_all_databases   — every 24 hours from deploy/startup
+  2. verify_urls            — every 24 hours
+  3. health_report          — every 6 hours
+  4. scholarship_alert      — every 12 hours
 """
 from __future__ import annotations
 
@@ -62,53 +60,134 @@ async def _post_slack(text: str, blocks: list[dict] | None = None):
         log.error("slack_error", error=str(e))
 
 
+async def _run_async_scraper(scraper_name: str, scraper, clear_checkpoint: bool = False) -> int:
+    """Run an async scraper and return the count of scraped items."""
+    if clear_checkpoint and hasattr(scraper, "_checkpoint"):
+        try:
+            scraper._checkpoint.clear()
+            log.info("checkpoint_cleared", scraper=scraper_name)
+        except Exception as exc:
+            log.warning("checkpoint_clear_failed", scraper=scraper_name, error=str(exc))
+
+    try:
+        items = await scraper.scrape()
+        count = len(items) if isinstance(items, list) else 0
+        log.info("scraper_complete", scraper=scraper_name, count=count)
+        return count
+    except Exception as e:
+        log.error("scraper_failed", scraper=scraper_name, error=str(e))
+        return 0
+    finally:
+        if hasattr(scraper, "close"):
+            try:
+                await scraper.close()
+            except Exception:
+                pass
+
+
+async def _run_sync_scraper(scraper_name: str, fn, *args, **kwargs) -> int:
+    """Run a synchronous scraper on a thread and return the final saved count."""
+    try:
+        result = await asyncio.to_thread(fn, *args, **kwargs)
+        count = len(result) if isinstance(result, list) else 0
+        log.info("sync_scraper_complete", scraper=scraper_name, count=count)
+        return count
+    except Exception as e:
+        log.error("sync_scraper_failed", scraper=scraper_name, error=str(e))
+        return 0
+
+
+async def _save_phd_seeker_data(scraper) -> int:
+    """Save PhD-Seeker output to Supabase."""
+    try:
+        positions = await asyncio.to_thread(scraper.scrape)
+        if not positions:
+            log.info("phd_seeker_no_positions")
+            return 0
+        saved = await asyncio.to_thread(scraper.save_to_database, positions)
+        log.info("phd_seeker_saved", count=saved)
+        return saved
+    except Exception as e:
+        log.error("phd_seeker_save_failed", error=str(e))
+        return 0
+
+
 # ════════════════════════════════════════════════════════════════════════════
-# JOB 1: scrape_scholarships — every 12 hours
+# JOB 1: scrape_all_databases — every 24 hours from deploy/startup
 # ════════════════════════════════════════════════════════════════════════════
 
-async def scrape_scholarships():
-    """Run IDP scholarship scraper, then deactivate stale records."""
+async def scrape_all_databases():
+    """Run the full live scraper once and keep Supabase updated."""
     job_start = time.time()
-    log.info("job_start", job="scrape_scholarships")
+    log.info("job_start", job="scrape_all_databases")
+
     try:
         from src.scrapers.idp_scholarships import IDPScholarshipScraper
+        from src.scrapers.idp_courses import IDPCourseScraper
+        from src.scrapers.idp_universities import IDPUniversityScraper
+        from src.scrapers.idp_visa import IDPVisaScraper
+        from src.scrapers.idp_cost_of_living import CostOfLivingScraper
+        from src.scrapers.govt_scholarships import StudyAustraliaScholarshipScraper
+        from src.scrapers.phd_seeker_scraper import PhDSeekerScraper
 
-        scraper = IDPScholarshipScraper(save_to_db=True)
-        results = await scraper.scrape()
-        await scraper.close()
+        counts: dict[str, int] = {}
 
-        scraped_count = len(results) if isinstance(results, list) else 0
-
-        # Deactivate scholarships not seen in the last 24 hours
-        db = _get_db()
-        cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-
-        # Get count of stale records first
-        stale = (
-            db.table("scholarships").select("id", count="exact")
-            .eq("is_active", True)
-            .lt("updated_at", cutoff)
-            .execute()
+        scholarships_scraper = IDPScholarshipScraper(save_to_db=True)
+        counts["idp_scholarships"] = await _run_async_scraper(
+            "idp_scholarships", scholarships_scraper
         )
-        stale_count = stale.count or 0
 
-        if stale_count > 0:
-            db.table("scholarships").update({"is_active": False}).eq("is_active", True).lt("updated_at", cutoff).execute()
+        courses_scraper = IDPCourseScraper(save_to_db=True)
+        counts["idp_courses"] = await _run_async_scraper(
+            "idp_courses", courses_scraper, clear_checkpoint=True
+        )
 
+        universities_scraper = IDPUniversityScraper(save_to_db=True)
+        counts["idp_universities"] = await _run_async_scraper(
+            "idp_universities", universities_scraper
+        )
+
+        visa_scraper = IDPVisaScraper(save_to_db=True)
+        counts["visa_requirements"] = await _run_async_scraper(
+            "visa_requirements", visa_scraper
+        )
+
+        cost_scraper = CostOfLivingScraper(save_to_db=True)
+        counts["cost_of_living"] = await _run_async_scraper(
+            "cost_of_living", cost_scraper
+        )
+
+        govt_scraper = StudyAustraliaScholarshipScraper(save_to_db=True)
+        counts["govt_scholarships"] = await _run_async_scraper(
+            "govt_scholarships", govt_scraper
+        )
+
+        phd_scraper = PhDSeekerScraper()
+        counts["phd_seeker"] = await _save_phd_seeker_data(phd_scraper)
+
+        total = sum(counts.values())
         elapsed = round(time.time() - job_start, 1)
-        log.info("job_complete", job="scrape_scholarships",
-                 scraped=scraped_count, deactivated=stale_count,
-                 elapsed_seconds=elapsed)
+        log.info(
+            "job_complete",
+            job="scrape_all_databases",
+            counts=counts,
+            total=total,
+            elapsed_seconds=elapsed,
+        )
 
     except Exception as e:
         elapsed = round(time.time() - job_start, 1)
-        log.error("job_failed", job="scrape_scholarships",
-                  error=str(e), elapsed_seconds=elapsed)
+        log.error(
+            "job_failed",
+            job="scrape_all_databases",
+            error=str(e),
+            elapsed_seconds=elapsed,
+        )
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# JOB 2: scrape_courses — every 48 hours
-# ════════════════════════════════════════════════════════════════════════════
+# Helper: scrape_courses
+# ════════════════════════════════════════════════════════════════════
 
 async def scrape_courses():
     """Run IDP course scraper."""
@@ -133,7 +212,7 @@ async def scrape_courses():
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# JOB 3: scrape_universities — every 7 days
+# Helper: scrape_universities
 # ════════════════════════════════════════════════════════════════════════════
 
 async def scrape_universities():
@@ -368,50 +447,54 @@ async def scholarship_alert():
 # ════════════════════════════════════════════════════════════════════════════
 
 async def main():
-    """Start the APScheduler with all 6 jobs."""
+    """Start the APScheduler with the live daily scraper and support jobs."""
 
     scheduler = AsyncIOScheduler(timezone="UTC")
 
-    # JOB 1: Scholarships — every 12 hours
+    # JOB 1: Scrape all configured databases once immediately, then every 24 hours.
     scheduler.add_job(
-        scrape_scholarships, "interval", hours=12,
-        id="scrape_scholarships", name="Scrape IDP Scholarships",
-        max_instances=1, coalesce=True,
+        scrape_all_databases,
+        "interval",
+        hours=24,
+        next_run_time=datetime.now(timezone.utc),
+        id="scrape_all_databases",
+        name="Scrape All ScholarRadar Databases",
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=3600,
     )
 
-    # JOB 2: Courses — every 48 hours
+    # JOB 2: URL verification — every 24 hours
     scheduler.add_job(
-        scrape_courses, "interval", hours=48,
-        id="scrape_courses", name="Scrape IDP Courses",
-        max_instances=1, coalesce=True,
+        verify_urls,
+        "interval",
+        hours=24,
+        id="verify_urls",
+        name="Verify Scholarship URLs",
+        max_instances=1,
+        coalesce=True,
     )
 
-    # JOB 3: Universities — every 7 days
+    # JOB 3: Health report — every 6 hours
     scheduler.add_job(
-        scrape_universities, "interval", days=7,
-        id="scrape_universities", name="Scrape IDP Universities",
-        max_instances=1, coalesce=True,
+        health_report,
+        "interval",
+        hours=6,
+        id="health_report",
+        name="Data Health Report",
+        max_instances=1,
+        coalesce=True,
     )
 
-    # JOB 4: URL verification — every 24 hours
+    # JOB 4: Scholarship alerts — every 12 hours
     scheduler.add_job(
-        verify_urls, "interval", hours=24,
-        id="verify_urls", name="Verify Scholarship URLs",
-        max_instances=1, coalesce=True,
-    )
-
-    # JOB 5: Health report — every 6 hours
-    scheduler.add_job(
-        health_report, "interval", hours=6,
-        id="health_report", name="Data Health Report",
-        max_instances=1, coalesce=True,
-    )
-
-    # JOB 6: Scholarship alerts — every 12 hours
-    scheduler.add_job(
-        scholarship_alert, "interval", hours=12,
-        id="scholarship_alert", name="High-Value Scholarship Alert",
-        max_instances=1, coalesce=True,
+        scholarship_alert,
+        "interval",
+        hours=12,
+        id="scholarship_alert",
+        name="High-Value Scholarship Alert",
+        max_instances=1,
+        coalesce=True,
     )
 
     scheduler.start()
