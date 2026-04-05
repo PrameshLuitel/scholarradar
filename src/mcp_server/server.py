@@ -110,16 +110,11 @@ async def health_check():
         "tools_registered": len(tools)
     }
 
-# 7. MCP: insert mount at index 0 (handles /mcp/* and /mcp/sse)
-# Also add explicit redirect for bare /mcp → /mcp/ (Starlette Mount won't match without trailing slash)
-from starlette.routing import Mount as StarletteMount
-app.router.routes.insert(0, StarletteMount("/mcp", app=mcp_app))
-
-# 307 preserves the HTTP method (POST stays POST) — critical for Claude streamable HTTP transport
-from fastapi.responses import RedirectResponse as RR
-@app.api_route("/mcp", methods=["GET","POST","PUT","DELETE","PATCH","OPTIONS","HEAD"])
-async def mcp_root_redirect():
-    return RR(url="/mcp/", status_code=307)
+# 7. MCP: FastMCP exposes a route at '/mcp' (streamable HTTP transport).
+# Extend routes directly so /mcp is a first-class route on this app — no mounting tricks needed.
+mcp_app_routes = mcp_app.routes if hasattr(mcp_app, 'routes') else []
+for route in mcp_app_routes:
+    app.router.routes.insert(0, route)
 
 # 8. Serve Frontend Static Files
 from fastapi.staticfiles import StaticFiles
