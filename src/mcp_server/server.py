@@ -110,9 +110,10 @@ async def health_check():
         "tools_registered": len(tools)
     }
 
-# 7. MCP routes at /mcp — Claude connects to https://skolr.xyz/mcp
-# We extend at the router level so /mcp/sse and /mcp work natively
-app.mount("/mcp", mcp_app)
+# 7. MCP mount — insert at route index 0 so it is ALWAYS matched before the catch-all.
+# FastAPI's /{full_path:path} catch-all can otherwise intercept /mcp requests.
+from starlette.routing import Mount as StarletteMount
+app.router.routes.insert(0, StarletteMount("/mcp", app=mcp_app))
 
 # 8. Serve Frontend Static Files
 from fastapi.staticfiles import StaticFiles
@@ -124,11 +125,15 @@ assets_dir = FRONTEND_DIST / "assets"
 if assets_dir.exists() and assets_dir.is_dir():
     app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
-# Catch-all: serve the SPA for all unmatched paths
-# NOTE: Starlette processes app.mount() BEFORE @app.get routes, so /mcp, /dashboard,
-# /analytics, and /assets will never reach this handler. No need to 404 them here.
+# Catch-all: serve the SPA for all unmatched GET paths
 @app.get("/{full_path:path}")
 async def serve_frontend(request: Request, full_path: str):
+    # Safety net: never serve index.html for /mcp paths
+    # (the StarletteMount above should handle them first, but just in case)
+    if full_path.startswith("mcp"):
+        from starlette.exceptions import HTTPException
+        raise HTTPException(status_code=404, detail="MCP route not matched by mount")
+
     # Never serve index.html for file-extension requests — prevents MIME type errors
     asset_extensions = {".js", ".css", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".json", ".woff2", ".mp3"}
     is_asset = Path(full_path).suffix.lower() in asset_extensions
