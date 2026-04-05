@@ -75,13 +75,12 @@ app = FastAPI(
     lifespan=combined_lifespan
 )
 
-# 4.5 Include Analytics and Dashboard Endpoints directly to mcp_app
-# Using Starlette-compatible .mount() because mcp_app is a Starlette instance
+# 4.5 Include Analytics and Dashboard Endpoints directly to app
 from src.api.analytics import app as analytics_app
 from src.api.dashboard import app as dashboard_app
 
-mcp_app.mount("/analytics", analytics_app)
-mcp_app.mount("/dashboard", dashboard_app)
+app.mount("/analytics", analytics_app)
+app.mount("/dashboard", dashboard_app)
 
 # 5. CORS Middlewares
 app.add_middleware(
@@ -105,8 +104,8 @@ async def health_check():
         "tools_registered": len(tools)
     }
 
-# 7. Mount MCP at / (mcp_app already has /mcp route internally)
-app.mount("/", mcp_app)
+# 7. Add FastMCP routes to the main app directly
+app.router.routes.extend(mcp_app.routes)
 
 # 8. Serve Frontend Static Files
 from fastapi.staticfiles import StaticFiles
