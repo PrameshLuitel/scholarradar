@@ -18,7 +18,7 @@ async def _insert_item(table_name: str, item_data: Dict[str, Any]):
 
 # Scholarships
 async def create_scholarship(scholarship: Scholarship):
-    data = scholarship.model_dump(exclude_none=True)
+    data = scholarship.model_dump(mode='json', exclude_none=True)
     return await _insert_item("scholarships", data)
 
 async def get_scholarships(filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
@@ -41,7 +41,7 @@ async def upsert_scholarship(scholarship: Scholarship) -> Dict[str, Any]:
         UNIQUE (title, university);
     """
     db = get_db()
-    data = scholarship.model_dump(exclude_none=True)
+    data = scholarship.model_dump(mode='json', exclude_none=True)
     # Remove id/created_at — let the DB handle those
     data.pop("id", None)
     data.pop("created_at", None)
@@ -91,7 +91,7 @@ async def deactivate_stale_scholarships(
 
 # Courses
 async def create_course(course: Course):
-    data = course.model_dump(exclude_none=True)
+    data = course.model_dump(mode='json', exclude_none=True)
     return await _insert_item("courses", data)
 
 
@@ -104,7 +104,7 @@ async def upsert_course(course: Course) -> Dict[str, Any]:
         ALTER TABLE courses ADD CONSTRAINT uq_courses_name_uni UNIQUE (name, university);
     """
     db = get_db()
-    data = course.model_dump(exclude_none=True)
+    data = course.model_dump(mode='json', exclude_none=True)
     data.pop("id", None)
     data.pop("created_at", None)
     try:
@@ -129,7 +129,7 @@ async def search_courses(query_params: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 # Universities
 async def create_university(uni: University):
-    data = uni.model_dump(exclude_none=True)
+    data = uni.model_dump(mode='json', exclude_none=True)
     return await _insert_item("universities", data)
 
 
@@ -142,7 +142,7 @@ async def upsert_university(uni: University) -> Dict[str, Any]:
         ALTER TABLE universities ADD CONSTRAINT uq_uni_name_country UNIQUE (name, country);
     """
     db = get_db()
-    data = uni.model_dump(exclude_none=True)
+    data = uni.model_dump(mode='json', exclude_none=True)
     data.pop("id", None)
     data.pop("created_at", None)
     try:
@@ -164,7 +164,7 @@ async def get_university_by_id(uni_id: UUID) -> Optional[Dict[str, Any]]:
 
 # Visa Requirements
 async def upsert_visa_requirement(visa: VisaRequirement):
-    data = visa.model_dump(exclude_none=True)
+    data = visa.model_dump(mode='json', exclude_none=True)
     db = get_db()
     response = db.table("visa_requirements").upsert(data).execute()
     return response.data
