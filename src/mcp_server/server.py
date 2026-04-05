@@ -1,3 +1,4 @@
+from pathlib import Path
 import os
 import asyncio
 import base64
@@ -12,15 +13,20 @@ import structlog
 # Initialize logging
 log = structlog.get_logger("mcp_server.server")
 
-# Load Icon
+# 0. Setup Paths
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
+log.info("server_setup", base_dir=str(BASE_DIR), frontend_dist=str(FRONTEND_DIST))
+
+# Load Icon from frontend/public/favicon.svg
 icon_data = None
 try:
-    # server.py is in src/mcp_server/, so root is ../../
-    icon_path = os.path.join(os.path.dirname(__file__), "../../frontend/public/favicon.svg")
-    with open(icon_path, "rb") as f:
-        bint = f.read()
-        b64 = base64.b64encode(bint).decode("utf-8")
-        icon_data = f"data:image/svg+xml;base64,{b64}"
+    icon_path = BASE_DIR / "frontend" / "public" / "favicon.svg"
+    if icon_path.exists():
+        with open(icon_path, "rb") as f:
+            bint = f.read()
+            b64 = base64.b64encode(bint).decode("utf-8")
+            icon_data = f"data:image/svg+xml;base64,{b64}"
 except Exception as e:
     log.warning("failed_to_load_icon", error=str(e))
 
@@ -105,7 +111,6 @@ async def health_check():
     }
 
 # 7. Add FastMCP routes to the main app directly
-# This ensures that SSE and other root-level paths work correctly for MCP clients
 app.router.routes.extend(mcp_app.routes)
 
 # 8. Redirect Dashboard Root (no slash) to Dashboard /
@@ -118,35 +123,47 @@ async def redirect_dashboard():
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi import Request
-import os
 
-frontend_dist = os.path.join(os.path.dirname(__file__), "../../frontend/dist")
+# Mount assets explicitly
+assets_dir = FRONTEND_DIST / "assets"
+if assets_dir.exists() and assets_dir.is_dir():
+    app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
-# We mount /assets explicitly to ensure StaticFiles handles MIME types correctly
-if os.path.exists(os.path.join(frontend_dist, "assets")):
-    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
-
-# Catch-all route to serve the SPA index.html for unknown paths
+# Catch-all route to serve the SPA index.html
 @app.get("/{full_path:path}")
 async def serve_frontend(request: Request, full_path: str):
-    # Exclude known backend prefixes from falling through to the frontend catch-all
-    prefixes = ["health", "analytics", "dashboard"]
-    # FastMCP routes are also on the root, but they have specific matching.
-    # To be safe, we check if the path matches a registered route prefix.
-    if any(full_path.startswith(p) for p in prefixes):
+    # Exclude known backend prefixes from the frontend catch-all
+    backend_prefixes = ["health", "analytics", "dashboard"]
+    if any(full_path.startswith(p) for p in backend_prefixes):
         from starlette.exceptions import HTTPException
         raise HTTPException(status_code=404, detail="Backend route not found")
 
-    if not os.path.exists(frontend_dist):
-        return JSONResponse(status_code=500, content={"error": "Frontend build directory not found. Ensure 'npm run build' was executed."})
+    # If the path looks like an asset (has an extension), never serve index.html
+    # This prevents the browser from getting HTML when it expects JS/CSS (MIME Type error)
+    asset_extensions = {".js", ".css", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".json", ".woff2", ".mp3"}
+    path_obj = Path(full_path)
+    is_asset = path_obj.suffix.lower() in asset_extensions
 
-    # Serve the requested file if it exists in dist
-    file_path = os.path.join(frontend_dist, full_path)
-    if full_path and os.path.isfile(file_path):
-        return FileResponse(file_path)
+    if not FRONTEND_DIST.exists():
+        log.error("frontend_dist_missing", path=str(FRONTEND_DIST))
+        return JSONResponse(status_code=500, content={"error": "Frontend build directory not found."})
+
+    # Serve the requested file if it exists
+    file_path = FRONTEND_DIST / full_path
+    if full_path and file_path.exists() and file_path.is_file():
+        return FileResponse(str(file_path))
     
-    # Otherwise, fallback to index.html for SPA routing
-    return FileResponse(os.path.join(frontend_dist, "index.html"))
+    # If it's a missing asset, 404 instead of returning index.html
+    if is_asset:
+        from starlette.exceptions import HTTPException
+        raise HTTPException(status_code=404, detail=f"Asset '{full_path}' not found")
+
+    # Final fallback to index.html for SPA routing (only for extension-less paths or non-assets)
+    index_path = FRONTEND_DIST / "index.html"
+    if index_path.exists():
+        return FileResponse(str(index_path))
+    
+    return JSONResponse(status_code=404, content={"error": "Frontend entry point missing."})
 
 # 10. Entry Point
 if __name__ == "__main__":
