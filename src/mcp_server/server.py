@@ -104,16 +104,16 @@ async def health_check():
         "tools_registered": len(tools)
     }
 
-# 7. Add FastMCP routes to the main app directly
-app.router.routes.extend(mcp_app.routes)
+# 7. Add FastMCP routes under /mcp
+app.mount("/mcp", mcp_app)
 
-# 9. Redirect Dashboard Root (no slash) to Dashboard /
+# 8. Redirect Dashboard Root (no slash) to Dashboard /
 from fastapi.responses import RedirectResponse
-@app.get("/dashboard")
+@app.get("/dashboard", include_in_schema=False)
 async def redirect_dashboard():
     return RedirectResponse(url="/dashboard/")
 
-# 10. Serve Frontend Static Files
+# 9. Serve Frontend Static Files
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi import Request
@@ -121,35 +121,35 @@ import os
 
 frontend_dist = os.path.join(os.path.dirname(__file__), "../../frontend/dist")
 
-try:
+# Serve assets first
+if os.path.exists(os.path.join(frontend_dist, "assets")):
     app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
-except Exception as e:
-    log.warning("frontend_assets_missing", error=str(e))
-    
-# Catch-all route to serve the SPA index.html for unknown paths (e.g. React Router)
-@app.api_route("/{full_path:path}", methods=["GET"])
+
+# Catch-all route to serve the SPA index.html for unknown paths
+@app.get("/{full_path:path}")
 async def serve_frontend(request: Request, full_path: str):
-    # Allow API and Dashboard routes to be handled by their respective apps or 404 naturally
-    # We exclude these prefixes from the frontend catch-all
+    # If the path is intentionally a backend prefix, let it fall through or 404 naturally
+    # But since this matches everything, we check for prefixes manually
     prefixes = ["mcp", "health", "analytics", "dashboard"]
-    is_backend = full_path in prefixes or any(full_path.startswith(p + "/") for p in prefixes)
-    
-    if is_backend:
+    if any(full_path.startswith(p) for p in prefixes):
+        # This shouldn't happen for valid backend routes because they are defined BEFORE this catch-all
+        # but just in case, we return a 404 here for unrecognized backend-prefixed paths.
         from starlette.exceptions import HTTPException
-        raise HTTPException(status_code=404, detail="Not Found")
+        raise HTTPException(status_code=404, detail="Backend route not found")
 
-        
     if not os.path.exists(frontend_dist):
-         return JSONResponse(status_code=500, content={"error": "Frontend build directory not found. Ensure 'npm run build' was executed."})
+        return JSONResponse(status_code=500, content={"error": "Frontend build directory not found. Ensure 'npm run build' was executed."})
 
+    # If it's a file that exists in dist, serve it
     file_path = os.path.join(frontend_dist, full_path)
-    if os.path.isfile(file_path):
+    if full_path and os.path.isfile(file_path):
         return FileResponse(file_path)
     
+    # Otherwise, serve index.html (SPA routing)
     return FileResponse(os.path.join(frontend_dist, "index.html"))
 
-# 8. Entry Point
+# 10. Entry Point
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 10000))
+    port = int(os.getenv("PORT", 5173))
     log.info("server_start", port=port, env=os.getenv("RENDER_EXTERNAL_URL", "local"))
     uvicorn.run(app, host="0.0.0.0", port=port)
