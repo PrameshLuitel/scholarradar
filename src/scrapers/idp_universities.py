@@ -360,7 +360,7 @@ class IDPUniversityScraper(BaseScraper):
     def __init__(
         self,
         save_to_db: bool = True,
-        rate_limit_interval: float = 2.0,
+        rate_limit_interval: float = 0.2,
         locale: str = LOCALE,
     ):
         super().__init__(BASE_URL, rate_limit_interval=rate_limit_interval)
@@ -385,25 +385,32 @@ class IDPUniversityScraper(BaseScraper):
         universities: List[University] = []
         total = len(uni_stubs)
 
-        for idx, stub in enumerate(uni_stubs):
-            pct = round((idx / total) * 100, 1) if total else 0
-
-            if idx % 50 == 0:
-                await log.ainfo("progress", pct=f"{pct}%", done=idx, total=total)
-
+        import asyncio
+        async def _process_stub(stub):
             detail = await self._fetch_detail(stub["profile_url"])
             university = self._build_university(stub, detail)
             if university is None:
-                continue
-
-            universities.append(university)
-
+                return None
             if self.save_to_db:
                 try:
                     upsert_fn = _get_upsert_fn()
                     await upsert_fn(university)
                 except Exception:
                     pass
+            return university
+
+        batch_size = 20
+        for i in range(0, total, batch_size):
+            batch = uni_stubs[i:i + batch_size]
+            pct = round((i / total) * 100, 1) if total else 0
+            if i % 100 == 0:
+                await log.ainfo("progress", pct=f"{pct}%", done=i, total=total)
+            
+            tasks = [_process_stub(s) for s in batch]
+            results = await asyncio.gather(*tasks)
+            for res in results:
+                if res:
+                    universities.append(res)
 
         await log.ainfo("scrape_complete", total=len(universities))
         await self.close()

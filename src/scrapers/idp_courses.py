@@ -79,9 +79,9 @@ CARDS_PER_PAGE = 12
 CHECKPOINT_FILE = ".course_scraper_checkpoint.json"
 
 # Concurrency settings
-MAX_CONCURRENT_COMBOS = 5    # Number of country/level combos to scrape at once
+MAX_CONCURRENT_COMBOS = 10   # Number of country/level combos to scrape at once
 PAGE_BATCH_SIZE = 3          # Pages to fetch concurrently within a combo
-RATE_LIMIT_INTERVAL = 0.5    # Seconds between requests (down from 2.0)
+RATE_LIMIT_INTERVAL = 0.1    # Seconds between requests (down from 0.5)
 
 
 # ---------------------------------------------------------------------------

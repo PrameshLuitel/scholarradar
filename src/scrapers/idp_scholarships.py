@@ -193,7 +193,7 @@ class IDPScholarshipScraper(BaseScraper):
     def __init__(
         self,
         save_to_db: bool = True,
-        rate_limit_interval: float = 2.0,
+        rate_limit_interval: float = 0.2,
         locale: str = LOCALE,
     ):
         super().__init__(BASE_URL, rate_limit_interval=rate_limit_interval)
@@ -246,13 +246,12 @@ class IDPScholarshipScraper(BaseScraper):
             if not cards:
                 break  # no more results
 
-            for card in cards:
-                detail = await self._fetch_detail(card)
-                scholarship = self._build_scholarship(card, detail, country, level)
+            async def _process_card(c):
+                import asyncio
+                detail = await self._fetch_detail(c)
+                scholarship = self._build_scholarship(c, detail, country, level)
                 if scholarship is None:
-                    continue
-
-                scholarships.append(scholarship)
+                    return None
 
                 if self.save_to_db:
                     try:
@@ -262,6 +261,15 @@ class IDPScholarshipScraper(BaseScraper):
                             self._seen_ids.append(result["id"])
                     except Exception:
                         pass  # already logged
+                return scholarship
+
+            import asyncio
+            tasks = [_process_card(card) for card in cards]
+            results = await asyncio.gather(*tasks)
+            
+            for res in results:
+                if res is not None:
+                    scholarships.append(res)
 
             # If we got fewer than a full page, we've hit the last page
             if len(cards) < CARDS_PER_PAGE:
