@@ -133,7 +133,8 @@ if assets_dir.exists() and assets_dir.is_dir():
 @app.get("/{full_path:path}")
 async def serve_frontend(request: Request, full_path: str):
     # Exclude known backend prefixes from the frontend catch-all
-    backend_prefixes = ["health", "analytics", "dashboard"]
+    # 'sse' and 'mcp' are critical — FastMCP uses these for Claude to connect
+    backend_prefixes = ["health", "analytics", "dashboard", "sse", "mcp"]
     if any(full_path.startswith(p) for p in backend_prefixes):
         from starlette.exceptions import HTTPException
         raise HTTPException(status_code=404, detail="Backend route not found")
