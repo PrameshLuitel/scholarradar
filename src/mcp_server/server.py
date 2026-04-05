@@ -104,8 +104,9 @@ async def health_check():
         "tools_registered": len(tools)
     }
 
-# 7. Add FastMCP routes under /mcp
-app.mount("/mcp", mcp_app)
+# 7. Add FastMCP routes to the main app directly
+# This ensures that SSE and other root-level paths work correctly for MCP clients
+app.router.routes.extend(mcp_app.routes)
 
 # 8. Redirect Dashboard Root (no slash) to Dashboard /
 from fastapi.responses import RedirectResponse
@@ -121,31 +122,30 @@ import os
 
 frontend_dist = os.path.join(os.path.dirname(__file__), "../../frontend/dist")
 
-# Serve assets first
+# We mount /assets explicitly to ensure StaticFiles handles MIME types correctly
 if os.path.exists(os.path.join(frontend_dist, "assets")):
     app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
 
 # Catch-all route to serve the SPA index.html for unknown paths
 @app.get("/{full_path:path}")
 async def serve_frontend(request: Request, full_path: str):
-    # If the path is intentionally a backend prefix, let it fall through or 404 naturally
-    # But since this matches everything, we check for prefixes manually
-    prefixes = ["mcp", "health", "analytics", "dashboard"]
+    # Exclude known backend prefixes from falling through to the frontend catch-all
+    prefixes = ["health", "analytics", "dashboard"]
+    # FastMCP routes are also on the root, but they have specific matching.
+    # To be safe, we check if the path matches a registered route prefix.
     if any(full_path.startswith(p) for p in prefixes):
-        # This shouldn't happen for valid backend routes because they are defined BEFORE this catch-all
-        # but just in case, we return a 404 here for unrecognized backend-prefixed paths.
         from starlette.exceptions import HTTPException
         raise HTTPException(status_code=404, detail="Backend route not found")
 
     if not os.path.exists(frontend_dist):
         return JSONResponse(status_code=500, content={"error": "Frontend build directory not found. Ensure 'npm run build' was executed."})
 
-    # If it's a file that exists in dist, serve it
+    # Serve the requested file if it exists in dist
     file_path = os.path.join(frontend_dist, full_path)
     if full_path and os.path.isfile(file_path):
         return FileResponse(file_path)
     
-    # Otherwise, serve index.html (SPA routing)
+    # Otherwise, fallback to index.html for SPA routing
     return FileResponse(os.path.join(frontend_dist, "index.html"))
 
 # 10. Entry Point
