@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 150" width="800" height="300">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&amp;display=swap');
+      .logo { font-family: 'Inter', sans-serif; font-size: 100px; font-weight: 800; letter-spacing: -6px; }
+      .text { fill: #000000; }
+      .dot { fill: #2563eb; }
+    </style>
+  </defs>
+  <rect width="400" height="150" fill="#ffffff" rx="20"/>
+  <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" class="logo">
+    <tspan class="text">Skolr</tspan><tspan class="dot" dx="-5">.</tspan>
+  </text>
+</svg>
