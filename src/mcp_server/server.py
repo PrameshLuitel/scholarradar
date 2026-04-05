@@ -81,14 +81,14 @@ app = FastAPI(
     lifespan=combined_lifespan
 )
 
-# 4.5 Include Analytics and Dashboard Endpoints directly to app
+# 4.5 Include Analytics and Dashboard Endpoints
 from src.api.analytics import app as analytics_app
 from src.api.dashboard import app as dashboard_app
 
 app.mount("/analytics", analytics_app)
 app.mount("/dashboard", dashboard_app)
 
-# 5. CORS Middlewares
+# 5. CORS Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -110,60 +110,49 @@ async def health_check():
         "tools_registered": len(tools)
     }
 
-# 7. Mount FastMCP at /mcp — Claude connects to https://skolr.xyz/mcp
+# 7. MCP routes at /mcp — Claude connects to https://skolr.xyz/mcp
+# We extend at the router level so /mcp/sse and /mcp work natively
 app.mount("/mcp", mcp_app)
 
-# 8. Redirect Dashboard Root (no slash) to Dashboard /
-from fastapi.responses import RedirectResponse
-@app.get("/dashboard", include_in_schema=False)
-async def redirect_dashboard():
-    return RedirectResponse(url="/dashboard/")
-
-# 9. Serve Frontend Static Files
+# 8. Serve Frontend Static Files
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi import Request
 
-# Mount assets explicitly
+# Mount /assets so StaticFiles handles correct MIME types
 assets_dir = FRONTEND_DIST / "assets"
 if assets_dir.exists() and assets_dir.is_dir():
     app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
-# Catch-all route to serve the SPA index.html
+# Catch-all: serve the SPA for all unmatched paths
+# NOTE: Starlette processes app.mount() BEFORE @app.get routes, so /mcp, /dashboard,
+# /analytics, and /assets will never reach this handler. No need to 404 them here.
 @app.get("/{full_path:path}")
 async def serve_frontend(request: Request, full_path: str):
-    # Exclude known backend prefixes from the frontend catch-all
-    backend_prefixes = ["health", "analytics", "dashboard", "mcp"]
-    if any(full_path.startswith(p) for p in backend_prefixes):
-        from starlette.exceptions import HTTPException
-        raise HTTPException(status_code=404, detail="Backend route not found")
-
-    # If the path looks like an asset (has an extension), never serve index.html
-    # This prevents the browser from getting HTML when it expects JS/CSS (MIME Type error)
+    # Never serve index.html for file-extension requests — prevents MIME type errors
     asset_extensions = {".js", ".css", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".json", ".woff2", ".mp3"}
-    path_obj = Path(full_path)
-    is_asset = path_obj.suffix.lower() in asset_extensions
+    is_asset = Path(full_path).suffix.lower() in asset_extensions
 
     if not FRONTEND_DIST.exists():
         log.error("frontend_dist_missing", path=str(FRONTEND_DIST))
         return JSONResponse(status_code=500, content={"error": "Frontend build directory not found."})
 
-    # Serve the requested file if it exists
+    # Serve the file directly if it exists in dist
     file_path = FRONTEND_DIST / full_path
     if full_path and file_path.exists() and file_path.is_file():
         return FileResponse(str(file_path))
-    
-    # If it's a missing asset, 404 instead of returning index.html
+
+    # Missing asset → proper 404 (no HTML fallback)
     if is_asset:
         from starlette.exceptions import HTTPException
-        raise HTTPException(status_code=404, detail=f"Asset '{full_path}' not found")
+        raise HTTPException(status_code=404, detail=f"Asset not found: {full_path}")
 
-    # Final fallback to index.html for SPA routing (only for extension-less paths or non-assets)
+    # SPA fallback — serve index.html for all other paths (React Router handles them)
     index_path = FRONTEND_DIST / "index.html"
     if index_path.exists():
         return FileResponse(str(index_path))
-    
-    return JSONResponse(status_code=404, content={"error": "Frontend entry point missing."})
+
+    return JSONResponse(status_code=404, content={"error": "Frontend not built."})
 
 # 10. Entry Point
 if __name__ == "__main__":
