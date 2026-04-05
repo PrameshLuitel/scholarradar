@@ -1,5 +1,7 @@
 import os
 import asyncio
+import base64
+from mcp.types import Icon
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastmcp import FastMCP
@@ -10,6 +12,18 @@ import structlog
 # Initialize logging
 log = structlog.get_logger("mcp_server.server")
 
+# Load Icon
+icon_data = None
+try:
+    # server.py is in src/mcp_server/, so root is ../../
+    icon_path = os.path.join(os.path.dirname(__file__), "../../frontend/public/favicon.svg")
+    with open(icon_path, "rb") as f:
+        bint = f.read()
+        b64 = base64.b64encode(bint).decode("utf-8")
+        icon_data = f"data:image/svg+xml;base64,{b64}"
+except Exception as e:
+    log.warning("failed_to_load_icon", error=str(e))
+
 # 1. Create FastMCP instance
 mcp = FastMCP(
     name="ScholarRadar",
@@ -19,7 +33,8 @@ mcp = FastMCP(
     
     Always use the available tools to provide data-backed advice. 
     When providing links, always show direct university, program, or government website links instead of IDP or other middleman links.
-    If a student asks for a 'plan', use the `plan_study_abroad_journey` tool first."""
+    If a student asks for a 'plan', use the `plan_study_abroad_journey` tool first.""",
+    icons=[Icon(src=icon_data, mimeType="image/svg+xml")] if icon_data else None
 )
 
 # 2. Register all tool modules
