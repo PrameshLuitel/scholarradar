@@ -10,7 +10,12 @@ export default function Header() {
         </Link>
         <nav className="hidden md:flex gap-10 text-sm font-medium tracking-wide text-gray-600">
           <a href="/#features" className="hover:text-black transition-colors">Platform</a>
+          <a href="/dashboard" className="hover:text-black transition-colors flex items-center gap-1.5 group">
+            Dashboard
+            <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse ring-2 ring-emerald-500/20"></span>
+          </a>
           <a href="/#connect" className="hover:text-black transition-colors">Connect</a>
+
           <a href="/#pricing" className="hover:text-black transition-colors text-blue-600 relative">
             Pricing
             <span className="absolute -top-3 -right-6 text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded-full">FREE</span>

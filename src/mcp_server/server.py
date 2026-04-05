@@ -107,7 +107,13 @@ async def health_check():
 # 7. Add FastMCP routes to the main app directly
 app.router.routes.extend(mcp_app.routes)
 
-# 8. Serve Frontend Static Files
+# 9. Redirect Dashboard Root (no slash) to Dashboard /
+from fastapi.responses import RedirectResponse
+@app.get("/dashboard")
+async def redirect_dashboard():
+    return RedirectResponse(url="/dashboard/")
+
+# 10. Serve Frontend Static Files
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi import Request
@@ -123,10 +129,15 @@ except Exception as e:
 # Catch-all route to serve the SPA index.html for unknown paths (e.g. React Router)
 @app.api_route("/{full_path:path}", methods=["GET"])
 async def serve_frontend(request: Request, full_path: str):
-    # Allow API routes to 404 naturally if they don't exist
-    if full_path.startswith("mcp/") or full_path.startswith("health") or full_path.startswith("analytics/") or full_path.startswith("dashboard/"):
+    # Allow API and Dashboard routes to be handled by their respective apps or 404 naturally
+    # We exclude these prefixes from the frontend catch-all
+    prefixes = ["mcp", "health", "analytics", "dashboard"]
+    is_backend = full_path in prefixes or any(full_path.startswith(p + "/") for p in prefixes)
+    
+    if is_backend:
         from starlette.exceptions import HTTPException
         raise HTTPException(status_code=404, detail="Not Found")
+
         
     if not os.path.exists(frontend_dist):
          return JSONResponse(status_code=500, content={"error": "Frontend build directory not found. Ensure 'npm run build' was executed."})
