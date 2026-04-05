@@ -110,8 +110,8 @@ async def health_check():
         "tools_registered": len(tools)
     }
 
-# 7. Add FastMCP routes to the main app directly
-app.router.routes.extend(mcp_app.routes)
+# 7. Mount FastMCP at /mcp — Claude connects to https://skolr.xyz/mcp
+app.mount("/mcp", mcp_app)
 
 # 8. Redirect Dashboard Root (no slash) to Dashboard /
 from fastapi.responses import RedirectResponse
@@ -133,8 +133,7 @@ if assets_dir.exists() and assets_dir.is_dir():
 @app.get("/{full_path:path}")
 async def serve_frontend(request: Request, full_path: str):
     # Exclude known backend prefixes from the frontend catch-all
-    # 'sse' and 'mcp' are critical — FastMCP uses these for Claude to connect
-    backend_prefixes = ["health", "analytics", "dashboard", "sse", "mcp"]
+    backend_prefixes = ["health", "analytics", "dashboard", "mcp"]
     if any(full_path.startswith(p) for p in backend_prefixes):
         from starlette.exceptions import HTTPException
         raise HTTPException(status_code=404, detail="Backend route not found")
