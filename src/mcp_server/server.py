@@ -110,15 +110,9 @@ async def health_check():
         "tools_registered": len(tools)
     }
 
-# 7. MCP: FastMCP exposes a route at '/mcp' (streamable HTTP transport).
-# Extend routes directly so /mcp is a first-class route on this app — no mounting tricks needed.
-mcp_app_routes = mcp_app.routes if hasattr(mcp_app, 'routes') else []
-for route in mcp_app_routes:
-    app.router.routes.insert(0, route)
-
-# 8. Serve Frontend Static Files
+# 7. Serve Frontend Static Files
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi import Request
 
 # Mount /assets so StaticFiles handles correct MIME types
@@ -129,7 +123,6 @@ if assets_dir.exists() and assets_dir.is_dir():
 # Catch-all: serve the SPA for all unmatched GET paths
 @app.get("/{full_path:path}")
 async def serve_frontend(request: Request, full_path: str):
-    # Never serve index.html for file-extension requests — prevents MIME type errors
     asset_extensions = {".js", ".css", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".json", ".woff2", ".mp3"}
     is_asset = Path(full_path).suffix.lower() in asset_extensions
 
@@ -137,25 +130,44 @@ async def serve_frontend(request: Request, full_path: str):
         log.error("frontend_dist_missing", path=str(FRONTEND_DIST))
         return JSONResponse(status_code=500, content={"error": "Frontend build directory not found."})
 
-    # Serve the file directly if it exists in dist
     file_path = FRONTEND_DIST / full_path
     if full_path and file_path.exists() and file_path.is_file():
         return FileResponse(str(file_path))
 
-    # Missing asset → proper 404 (no HTML fallback)
     if is_asset:
         from starlette.exceptions import HTTPException
         raise HTTPException(status_code=404, detail=f"Asset not found: {full_path}")
 
-    # SPA fallback — serve index.html for all other paths (React Router handles them)
     index_path = FRONTEND_DIST / "index.html"
     if index_path.exists():
         return FileResponse(str(index_path))
 
     return JSONResponse(status_code=404, content={"error": "Frontend not built."})
 
-# 10. Entry Point
+
+# 8. ASGI Dispatcher — routes /mcp directly to FastMCP bypassing FastAPI's router entirely.
+# This is the only reliable way to prevent FastAPI's catch-all from intercepting /mcp.
+class MCPDispatcher:
+    """Pure ASGI dispatcher: /mcp* → mcp_app, everything else → fastapi app."""
+
+    def __init__(self, fastapi_app, mcp_asgi_app):
+        self._fastapi = fastapi_app
+        self._mcp = mcp_asgi_app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            path = scope.get("path", "")
+            if path == "/mcp" or path.startswith("/mcp/"):
+                await self._mcp(scope, receive, send)
+                return
+        await self._fastapi(scope, receive, send)
+
+
+# The top-level ASGI app exposed to uvicorn
+asgi_app = MCPDispatcher(fastapi_app=app, mcp_asgi_app=mcp_app)
+
+# 9. Entry Point
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5173))
     log.info("server_start", port=port, env=os.getenv("RENDER_EXTERNAL_URL", "local"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(asgi_app, host="0.0.0.0", port=port)
