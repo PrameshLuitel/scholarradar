@@ -90,8 +90,8 @@ async def health_check():
         "tools_registered": len(tools)
     }
 
-# 7. Mount MCP at /mcp (FastMCP allows this natively via FastAPI)
-app.mount("/mcp", mcp_app)
+# 7. Mount MCP at / (mcp_app already has /mcp route internally)
+app.mount("/", mcp_app)
 
 # 8. Serve Frontend Static Files
 from fastapi.staticfiles import StaticFiles
