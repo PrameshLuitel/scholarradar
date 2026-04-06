@@ -13,3 +13,7 @@ cv_updated.tex
 scrape_log.txt
 course_scrape.log
 claude-skills-main/
+
+# Scraper checkpoints
+.scholarship_scraper_checkpoint.json
+.course_scraper_checkpoint.json

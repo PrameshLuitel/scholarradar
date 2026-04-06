@@ -117,7 +117,7 @@ async def _save_phd_seeker_data(scraper) -> int:
 # ════════════════════════════════════════════════════════════════════════════
 
 async def scrape_all_databases():
-    """Run the full live scraper once and keep Supabase updated."""
+    """Run the full live scraper: heavy scrapers in parallel, then fast ones in parallel."""
     job_start = time.time()
     log.info("job_start", job="scrape_all_databases")
 
@@ -132,38 +132,49 @@ async def scrape_all_databases():
 
         counts: dict[str, int] = {}
 
+        # ── GROUP 1: Heavy scrapers — run concurrently ──
+        log.info("group_start", group="heavy", scrapers=["scholarships", "courses", "universities"])
+
         scholarships_scraper = IDPScholarshipScraper(save_to_db=True)
-        counts["idp_scholarships"] = await _run_async_scraper(
-            "idp_scholarships", scholarships_scraper
-        )
-
         courses_scraper = IDPCourseScraper(save_to_db=True)
-        counts["idp_courses"] = await _run_async_scraper(
-            "idp_courses", courses_scraper, clear_checkpoint=True
+        universities_scraper = IDPUniversityScraper(save_to_db=True)
+
+        heavy_results = await asyncio.gather(
+            _run_async_scraper("idp_scholarships", scholarships_scraper),
+            _run_async_scraper("idp_courses", courses_scraper, clear_checkpoint=True),
+            _run_async_scraper("idp_universities", universities_scraper),
         )
 
-        universities_scraper = IDPUniversityScraper(save_to_db=True)
-        counts["idp_universities"] = await _run_async_scraper(
-            "idp_universities", universities_scraper
-        )
+        counts["idp_scholarships"] = heavy_results[0]
+        counts["idp_courses"] = heavy_results[1]
+        counts["idp_universities"] = heavy_results[2]
+
+        heavy_elapsed = round(time.time() - job_start, 1)
+        log.info("group_complete", group="heavy", elapsed_seconds=heavy_elapsed, counts={
+            "scholarships": counts["idp_scholarships"],
+            "courses": counts["idp_courses"],
+            "universities": counts["idp_universities"],
+        })
+
+        # ── GROUP 2: Fast scrapers — run concurrently ──
+        log.info("group_start", group="fast", scrapers=["visa", "cost", "govt", "phd"])
 
         visa_scraper = IDPVisaScraper(save_to_db=True)
-        counts["visa_requirements"] = await _run_async_scraper(
-            "visa_requirements", visa_scraper
-        )
-
         cost_scraper = CostOfLivingScraper(save_to_db=True)
-        counts["cost_of_living"] = await _run_async_scraper(
-            "cost_of_living", cost_scraper
-        )
-
         govt_scraper = StudyAustraliaScholarshipScraper(save_to_db=True)
-        counts["govt_scholarships"] = await _run_async_scraper(
-            "govt_scholarships", govt_scraper
+        phd_scraper = PhDSeekerScraper()
+
+        fast_results = await asyncio.gather(
+            _run_async_scraper("visa_requirements", visa_scraper),
+            _run_async_scraper("cost_of_living", cost_scraper),
+            _run_async_scraper("govt_scholarships", govt_scraper),
+            _save_phd_seeker_data(phd_scraper),
         )
 
-        phd_scraper = PhDSeekerScraper()
-        counts["phd_seeker"] = await _save_phd_seeker_data(phd_scraper)
+        counts["visa_requirements"] = fast_results[0]
+        counts["cost_of_living"] = fast_results[1]
+        counts["govt_scholarships"] = fast_results[2]
+        counts["phd_seeker"] = fast_results[3]
 
         total = sum(counts.values())
         elapsed = round(time.time() - job_start, 1)
@@ -173,6 +184,7 @@ async def scrape_all_databases():
             counts=counts,
             total=total,
             elapsed_seconds=elapsed,
+            elapsed_minutes=round(elapsed / 60, 1),
         )
 
     except Exception as e:

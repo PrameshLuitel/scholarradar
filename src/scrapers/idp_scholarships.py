@@ -7,7 +7,9 @@ each detail page, validates with Pydantic, upserts to Supabase, and
 deactivates stale records.
 """
 
+import asyncio
 import re
+import time
 from datetime import datetime, date
 from typing import List, Optional, Dict, Any
 from urllib.parse import urljoin, urlencode, urlparse
@@ -181,6 +183,11 @@ class IDPScholarshipScraper(BaseScraper):
     """
     Scrapes the live IDP scholarship search at idp.com.
 
+    FAST concurrent version:
+    - 8 country×level combos run concurrently via asyncio.Semaphore
+    - 12 detail pages fetched concurrently per listing page via asyncio.gather
+    - Checkpoint/resume: saves progress, skips completed combos on restart
+
     Real HTML structure (reverse-engineered March 2026):
     - Cards: div.interactive-card
     - Title: a.h4 (inside card)
@@ -190,42 +197,141 @@ class IDPScholarshipScraper(BaseScraper):
     - Detail page: 3 × div.faq-content (overview, eligibility, how to apply)
     """
 
+    # Concurrency settings
+    MAX_CONCURRENT_COMBOS = 8
+    DETAIL_BATCH_SIZE = 12
+    CHECKPOINT_FILE = ".scholarship_scraper_checkpoint.json"
+
     def __init__(
         self,
         save_to_db: bool = True,
-        rate_limit_interval: float = 0.2,
+        rate_limit_interval: float = 0.15,
         locale: str = LOCALE,
     ):
         super().__init__(BASE_URL, rate_limit_interval=rate_limit_interval)
         self.save_to_db = save_to_db
         self.locale = locale
         self._seen_ids: List[str] = []
+        self._seen_ids_lock = asyncio.Lock()
+        self._combo_semaphore = asyncio.Semaphore(self.MAX_CONCURRENT_COMBOS)
+        self._all_scholarships: List[Scholarship] = []
+        self._results_lock = asyncio.Lock()
+        self._checkpoint = self._load_checkpoint()
+        self._start_time: float = 0
+
+    # -- checkpoint helpers --------------------------------------------------
+
+    def _load_checkpoint(self) -> Dict[str, Any]:
+        import json, os
+        if os.path.exists(self.CHECKPOINT_FILE):
+            with open(self.CHECKPOINT_FILE, "r") as f:
+                data = json.load(f)
+                log.info("checkpoint_loaded", completed=len(data.get("completed", {})))
+                return data
+        return {"completed": {}, "total_scraped": 0}
+
+    def _save_checkpoint(self):
+        import json
+        with open(self.CHECKPOINT_FILE, "w") as f:
+            json.dump(self._checkpoint, f, indent=2)
+
+    def _is_combo_done(self, key: str) -> bool:
+        return key in self._checkpoint.get("completed", {})
+
+    def _mark_combo_done(self, key: str, count: int):
+        self._checkpoint.setdefault("completed", {})[key] = {
+            "count": count,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+        self._checkpoint["total_scraped"] = sum(
+            v["count"] for v in self._checkpoint["completed"].values()
+        )
+        self._save_checkpoint()
+
+    def clear_checkpoint(self):
+        import os
+        self._checkpoint = {"completed": {}, "total_scraped": 0}
+        if os.path.exists(self.CHECKPOINT_FILE):
+            os.remove(self.CHECKPOINT_FILE)
 
     # -- public entry-point --------------------------------------------------
 
     async def scrape(self) -> List[Scholarship]:
-        all_scholarships: List[Scholarship] = []
+        self._start_time = time.monotonic()
+        combos = [
+            (country, level)
+            for country in COUNTRIES
+            for level in STUDY_LEVELS
+        ]
+        total_combos = len(combos)
 
-        for country in COUNTRIES:
-            for level in STUDY_LEVELS:
-                combo_results = await self._scrape_combination(country, level)
-                all_scholarships.extend(combo_results)
+        await log.ainfo(
+            "scrape_start",
+            total_combos=total_combos,
+            max_concurrent=self.MAX_CONCURRENT_COMBOS,
+            rate_limit=self._rate_limiter.interval,
+        )
 
-                await log.ainfo(
-                    "combination_complete",
-                    country=country,
-                    level=level,
-                    found=len(combo_results),
-                )
+        tasks = [
+            self._scrape_combo_with_semaphore(country, level, idx, total_combos)
+            for idx, (country, level) in enumerate(combos)
+        ]
+        await asyncio.gather(*tasks)
 
         if self.save_to_db and self._seen_ids:
             _, deactivate_fn = _get_db_functions()
             deactivated = await deactivate_fn("idp", self._seen_ids)
             await log.ainfo("stale_records_deactivated", count=deactivated)
 
-        await log.ainfo("scrape_complete", total=len(all_scholarships))
+        elapsed = time.monotonic() - self._start_time
+        await log.ainfo(
+            "scrape_complete",
+            total=len(self._all_scholarships),
+            elapsed_minutes=round(elapsed / 60, 1),
+        )
         await self.close()
-        return all_scholarships
+
+        # Clean up checkpoint on successful complete run
+        self.clear_checkpoint()
+        return self._all_scholarships
+
+    # -- semaphore wrapper ---------------------------------------------------
+
+    async def _scrape_combo_with_semaphore(
+        self, country: str, level: str, idx: int, total: int
+    ):
+        combo_key = f"{country}:{level}"
+        pct = round((idx / total) * 100, 1)
+
+        if self._is_combo_done(combo_key):
+            await log.ainfo("combo_skipped", combo=combo_key, progress=f"{pct}%")
+            return
+
+        async with self._combo_semaphore:
+            await log.ainfo(
+                "combo_start",
+                combo=combo_key,
+                progress=f"{pct}%",
+                elapsed=f"{round(time.monotonic() - self._start_time, 0)}s",
+            )
+
+            combo_start = time.monotonic()
+            combo_results = await self._scrape_combination(country, level)
+
+            async with self._results_lock:
+                self._all_scholarships.extend(combo_results)
+
+            self._mark_combo_done(combo_key, len(combo_results))
+            combo_elapsed = time.monotonic() - combo_start
+
+            await log.ainfo(
+                "combo_complete",
+                combo=combo_key,
+                found=len(combo_results),
+                total_so_far=len(self._all_scholarships),
+                combo_seconds=round(combo_elapsed, 1),
+                progress=f"{round(((idx + 1) / total) * 100, 1)}%",
+            )
 
     # -- per combination (paginated) -----------------------------------------
 
@@ -246,30 +352,26 @@ class IDPScholarshipScraper(BaseScraper):
             if not cards:
                 break  # no more results
 
-            async def _process_card(c):
-                import asyncio
-                detail = await self._fetch_detail(c)
-                scholarship = self._build_scholarship(c, detail, country, level)
+            # Batch-fetch all detail pages for this page's cards concurrently
+            detail_tasks = [self._fetch_detail(card) for card in cards]
+            details = await asyncio.gather(*detail_tasks)
+
+            for card, detail in zip(cards, details):
+                scholarship = self._build_scholarship(card, detail, country, level)
                 if scholarship is None:
-                    return None
+                    continue
+
+                scholarships.append(scholarship)
 
                 if self.save_to_db:
                     try:
                         upsert_fn, _ = _get_db_functions()
                         result = await upsert_fn(scholarship)
                         if result and result.get("id"):
-                            self._seen_ids.append(result["id"])
+                            async with self._seen_ids_lock:
+                                self._seen_ids.append(result["id"])
                     except Exception:
                         pass  # already logged
-                return scholarship
-
-            import asyncio
-            tasks = [_process_card(card) for card in cards]
-            results = await asyncio.gather(*tasks)
-            
-            for res in results:
-                if res is not None:
-                    scholarships.append(res)
 
             # If we got fewer than a full page, we've hit the last page
             if len(cards) < CARDS_PER_PAGE:

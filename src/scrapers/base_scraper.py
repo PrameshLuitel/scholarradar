@@ -147,8 +147,8 @@ class BaseScraper(ABC):
                 timeout=httpx.Timeout(self.timeout),
                 follow_redirects=True,
                 limits=httpx.Limits(
-                    max_connections=10,
-                    max_keepalive_connections=5,
+                    max_connections=40,
+                    max_keepalive_connections=20,
                 ),
             )
         return self._client
