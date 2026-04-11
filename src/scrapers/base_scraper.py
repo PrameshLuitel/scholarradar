@@ -36,7 +36,7 @@ USER_AGENTS = [
 ]
 
 # Errors we want tenacity to retry on
-RETRYABLE_STATUS_CODES = {429, 503}
+RETRYABLE_STATUS_CODES = {403, 429, 503}
 
 
 class _RetryableHTTPError(Exception):
@@ -179,7 +179,19 @@ class BaseScraper(ABC):
         Returns ``None`` for non-retryable failures (403, other errors).
         """
         client = await self._get_client()
-        headers = {"User-Agent": self._random_ua()}
+        headers = {
+            "User-Agent": self._random_ua(),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+        }
         start = time.monotonic()
 
         try:
@@ -194,11 +206,9 @@ class BaseScraper(ABC):
             )
 
             if response.status_code in RETRYABLE_STATUS_CODES:
+                if response.status_code == 403:
+                    await self._log.awarning("http_forbidden_retrying", url=url)
                 raise _RetryableHTTPError(response.status_code, url)
-
-            if response.status_code == 403:
-                await self._log.awarning("http_forbidden", url=url)
-                return None
 
             response.raise_for_status()
             return response.text

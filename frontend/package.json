@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "studio": "remotion studio src/remotion/Root.tsx",
-    "build:reel": "remotion render src/remotion/Root.tsx InstagramReel out/skolr-reel.mp4"
+    "build:reel": "remotion render src/remotion/Root.tsx InstagramReel out/skolr-reel.mp4",
+    "build:promo": "remotion render src/remotion/Root.tsx ScholarPromo out/scholar-promo.mp4"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.444",

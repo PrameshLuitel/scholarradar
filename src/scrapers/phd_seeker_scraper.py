@@ -57,9 +57,16 @@ class PhDSeekerScraper:
             return None
 
         try:
+            # Fix for "no current event loop" when running in a background thread
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
             # Create PhD-Seeker instance
             ps = PhDSeeker(keywords, maxpage=max_pages)
-
+            
             # Get positions DataFrame
             df = ps.positions
 

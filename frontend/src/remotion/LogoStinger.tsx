@@ -185,15 +185,15 @@ export const LogoStinger: React.FC = () => {
             
             {/* Audio Track Mapping using Remotion Best Practices (staticFile) and reliable Google Actions Sounds */}
             <Sequence from={2}> <Audio src={staticFile('sounds/whoosh.mp3')} volume={0.6} /> </Sequence>
-            <Sequence from={29}> <Audio src="https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg" volume={0.8} /> </Sequence>
-            <Sequence from={49}> <Audio src="https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg" volume={0.5} /> </Sequence>
-            <Sequence from={69}> <Audio src="https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg" volume={0.3} /> </Sequence>
+            <Sequence from={29}> <Audio src={staticFile('sounds/ding.mp3')} volume={0.4} playbackRate={2.0} /> </Sequence>
+            <Sequence from={49}> <Audio src={staticFile('sounds/ding.mp3')} volume={0.3} playbackRate={2.2} /> </Sequence>
+            <Sequence from={69}> <Audio src={staticFile('sounds/ding.mp3')} volume={0.2} playbackRate={2.4} /> </Sequence>
             
             {/* Final Ding and typing pop sounds for 'xyz' Expansion (3 characters = 3 pops) */}
             <Sequence from={85}> <Audio src={staticFile('sounds/ding.mp3')} volume={1} /> </Sequence>
-            <Sequence from={100}> <Audio src="https://actions.google.com/sounds/v1/cartoon/pop.ogg" volume={0.8} /> </Sequence>
-            <Sequence from={104}> <Audio src="https://actions.google.com/sounds/v1/cartoon/pop.ogg" volume={0.7} playbackRate={1.2} /> </Sequence>
-            <Sequence from={108}> <Audio src="https://actions.google.com/sounds/v1/cartoon/pop.ogg" volume={0.6} playbackRate={1.4} /> </Sequence>
+            <Sequence from={100}> <Audio src={staticFile('sounds/ding.mp3')} volume={0.5} playbackRate={3.0} /> </Sequence>
+            <Sequence from={104}> <Audio src={staticFile('sounds/ding.mp3')} volume={0.4} playbackRate={3.2} /> </Sequence>
+            <Sequence from={108}> <Audio src={staticFile('sounds/ding.mp3')} volume={0.3} playbackRate={3.4} /> </Sequence>
             
             {/* Subtitle gentle whoosh */}
             <Sequence from={110}> <Audio src={staticFile('sounds/whoosh.mp3')} volume={0.5} playbackRate={0.7} /> </Sequence>

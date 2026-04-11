@@ -1,6 +1,7 @@
 import { Composition, Still, registerRoot } from 'remotion';
 import { InstagramReel } from './InstagramReel';
 import { InstaGridLeft, InstaGridCenter, InstaGridRight } from './InstagramGrid';
+import { ScholarPromo } from './ScholarPromo';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -8,7 +9,16 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="InstagramReel"
         component={InstagramReel}
-        durationInFrames={160} // 160 frames gives a solid 2 seconds to absorb the final 'skolr.xyz' state
+        durationInFrames={160} // Original short reel
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+
+      <Composition
+        id="ScholarPromo"
+        component={ScholarPromo}
+        durationInFrames={1230} // ~41 seconds (Recalibrated for full Audio)
         fps={30}
         width={1080}
         height={1920}

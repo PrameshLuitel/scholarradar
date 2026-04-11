@@ -352,7 +352,7 @@ class CostOfLivingScraper(BaseScraper):
         try:
             from src.database.client import get_db
             db = get_db()
-            data = cost.model_dump(exclude_none=True)
+            data = cost.model_dump(mode='json', exclude_none=True)
             data.pop("id", None)
             db.table("cost_of_living").upsert(
                 data, on_conflict="city,country"
