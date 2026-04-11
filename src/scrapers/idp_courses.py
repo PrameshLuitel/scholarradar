@@ -36,6 +36,7 @@ from src.database.models import Course
 
 # Lazy DB imports (supabase may not be installed in test env)
 _upsert_course = None
+_bulk_upsert_course = None
 
 
 def _get_upsert_fn():
@@ -44,6 +45,14 @@ def _get_upsert_fn():
         from src.database.queries import upsert_course
         _upsert_course = upsert_course
     return _upsert_course
+
+
+def _get_bulk_upsert_fn():
+    global _bulk_upsert_course
+    if _bulk_upsert_course is None:
+        from src.database.queries import bulk_upsert_courses
+        _bulk_upsert_course = bulk_upsert_courses
+    return _bulk_upsert_course
 
 
 log = structlog.get_logger().bind(scraper="IDPCourseScraper")
@@ -332,6 +341,13 @@ class IDPCourseScraper(BaseScraper):
             combo_start = time.monotonic()
             courses = await self._scrape_combination(country_key, country_slug, level)
 
+            if self.save_to_db and courses:
+                try:
+                    bulk_upsert_fn = _get_bulk_upsert_fn()
+                    await bulk_upsert_fn(courses)
+                except Exception as e:
+                    await log.aerror("combo_bulk_upsert_failed", combo=combo_key, error=str(e))
+
             async with self._courses_lock:
                 self._all_courses.extend(courses)
 
@@ -396,13 +412,6 @@ class IDPCourseScraper(BaseScraper):
                     course = self._build_course(card_data, country_key, level)
                     if course is not None:
                         courses.append(course)
-
-                        if self.save_to_db:
-                            try:
-                                upsert_fn = _get_upsert_fn()
-                                await upsert_fn(course)
-                            except Exception:
-                                pass
 
                 # If this page had fewer cards than expected, it's the last page
                 if len(cards) < CARDS_PER_PAGE:

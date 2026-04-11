@@ -1,4 +1,5 @@
 from typing import List, Optional, Any, Dict
+import asyncio
 from .client import get_db
 from .models import Scholarship, Course, University, VisaRequirement, CostOfLiving
 from src.utils.logger import logger
@@ -55,6 +56,33 @@ async def upsert_scholarship(scholarship: Scholarship) -> Dict[str, Any]:
     except Exception as e:
         logger.error("scholarship_upsert_failed", error=str(e), title=data.get("title"))
         raise
+
+
+    async def bulk_upsert_scholarships(scholarships: List[Scholarship]) -> List[str]:
+        if not scholarships:
+            return []
+        db = get_db()
+        data = []
+        for s in scholarships:
+            d = s.model_dump(mode='json', exclude_none=True)
+            d.pop("id", None)
+            d.pop("created_at", None)
+            data.append(d)
+        
+        all_ids = []
+        chunk_size = 500
+        for i in range(0, len(data), chunk_size):
+            chunk = data[i:i + chunk_size]
+            try:
+                # Wrap synchronous DB call in to_thread so it doesn't block the async loop
+                response = await asyncio.to_thread(
+                    db.table("scholarships").upsert(chunk, on_conflict="title,university").execute
+                )
+                if response.data:
+                    all_ids.extend([row["id"] for row in response.data if "id" in row])
+            except Exception as e:
+                logger.error("scholarships_bulk_upsert_failed", error=str(e), count=len(chunk))
+        return all_ids
 
 
 async def deactivate_stale_scholarships(
@@ -119,6 +147,32 @@ async def upsert_course(course: Course) -> Dict[str, Any]:
         raise
 
 
+    async def bulk_upsert_courses(courses: List[Course]) -> List[str]:
+        if not courses:
+            return []
+        db = get_db()
+        data = []
+        for c in courses:
+            d = c.model_dump(mode='json', exclude_none=True)
+            d.pop("id", None)
+            d.pop("created_at", None)
+            data.append(d)
+        
+        all_ids = []
+        chunk_size = 500
+        for i in range(0, len(data), chunk_size):
+            chunk = data[i:i + chunk_size]
+            try:
+                response = await asyncio.to_thread(
+                    db.table("courses").upsert(chunk, on_conflict="name,university").execute
+                )
+                if response.data:
+                    all_ids.extend([row["id"] for row in response.data if "id" in row])
+            except Exception as e:
+                logger.error("courses_bulk_upsert_failed", error=str(e), count=len(chunk))
+        return all_ids
+
+
 async def search_courses(query_params: Dict[str, Any]) -> List[Dict[str, Any]]:
     db = get_db()
     query = db.table("courses").select("*")
@@ -155,6 +209,32 @@ async def upsert_university(uni: University) -> Dict[str, Any]:
     except Exception as e:
         logger.error("university_upsert_failed", error=str(e), name=data.get("name"))
         raise
+
+
+    async def bulk_upsert_universities(universities: List[University]) -> List[str]:
+        if not universities:
+            return []
+        db = get_db()
+        data = []
+        for u in universities:
+            d = u.model_dump(mode='json', exclude_none=True)
+            d.pop("id", None)
+            d.pop("created_at", None)
+            data.append(d)
+            
+        all_ids = []
+        chunk_size = 100
+        for i in range(0, len(data), chunk_size):
+            chunk = data[i:i + chunk_size]
+            try:
+                response = await asyncio.to_thread(
+                    db.table("universities").upsert(chunk, on_conflict="name,country").execute
+                )
+                if response.data:
+                    all_ids.extend([row["id"] for row in response.data if "id" in row])
+            except Exception as e:
+                logger.error("universities_bulk_upsert_failed", error=str(e), count=len(chunk))
+        return all_ids
 
 
 async def get_university_by_id(uni_id: UUID) -> Optional[Dict[str, Any]]:

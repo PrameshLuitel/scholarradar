@@ -27,11 +27,12 @@ CREATE TABLE scholarships (
     last_verified TIMESTAMPTZ
 );
 
--- Indexes for Scholarships
+-- Indexes and Constraints for Scholarships
 CREATE INDEX idx_scholarships_country ON scholarships(country);
 CREATE INDEX idx_scholarships_university ON scholarships(university);
 CREATE INDEX idx_scholarships_study_level ON scholarships(study_level);
 CREATE INDEX idx_scholarships_is_active ON scholarships(is_active);
+ALTER TABLE scholarships ADD CONSTRAINT uq_scholarships_title_uni UNIQUE (title, university);
 
 -- RLS Policies for Scholarships
 ALTER TABLE scholarships ENABLE ROW LEVEL SECURITY;
@@ -73,11 +74,12 @@ CREATE TABLE courses (
     last_verified TIMESTAMPTZ
 );
 
--- Indexes for Courses
+-- Indexes and Constraints for Courses
 CREATE INDEX idx_courses_country ON courses(country);
 CREATE INDEX idx_courses_university ON courses(university);
 CREATE INDEX idx_courses_subject_category ON courses(subject_category);
 CREATE INDEX idx_courses_is_active ON courses(is_active);
+ALTER TABLE courses ADD CONSTRAINT uq_courses_name_uni UNIQUE (name, university);
 
 -- RLS Policies for Courses
 ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
@@ -115,10 +117,11 @@ CREATE TABLE universities (
     idp_profile_url TEXT
 );
 
--- Indexes for Universities
+-- Indexes and Constraints for Universities
 CREATE INDEX idx_universities_country ON universities(country);
 CREATE INDEX idx_universities_name ON universities(name);
 CREATE INDEX idx_universities_world_ranking ON universities(world_ranking);
+ALTER TABLE universities ADD CONSTRAINT uq_uni_name_country UNIQUE (name, country);
 
 -- RLS Policies for Universities
 ALTER TABLE universities ENABLE ROW LEVEL SECURITY;

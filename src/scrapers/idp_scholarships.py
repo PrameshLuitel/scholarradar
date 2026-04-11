@@ -23,16 +23,18 @@ from src.database.models import Scholarship
 # Lazy imports — database queries require supabase which may not
 # be installed in test environments.  Import at call site instead.
 _upsert_scholarship = None
+_bulk_upsert_scholarship = None
 _deactivate_stale_scholarships = None
 
 
 def _get_db_functions():
-    global _upsert_scholarship, _deactivate_stale_scholarships
+    global _upsert_scholarship, _bulk_upsert_scholarship, _deactivate_stale_scholarships
     if _upsert_scholarship is None:
-        from src.database.queries import upsert_scholarship, deactivate_stale_scholarships
+        from src.database.queries import upsert_scholarship, bulk_upsert_scholarships, deactivate_stale_scholarships
         _upsert_scholarship = upsert_scholarship
+        _bulk_upsert_scholarship = bulk_upsert_scholarships
         _deactivate_stale_scholarships = deactivate_stale_scholarships
-    return _upsert_scholarship, _deactivate_stale_scholarships
+    return _upsert_scholarship, _bulk_upsert_scholarship, _deactivate_stale_scholarships
 
 log = structlog.get_logger().bind(scraper="IDPScholarshipScraper")
 
@@ -318,6 +320,16 @@ class IDPScholarshipScraper(BaseScraper):
             combo_start = time.monotonic()
             combo_results = await self._scrape_combination(country, level)
 
+            if self.save_to_db and combo_results:
+                try:
+                    _, bulk_upsert_fn, _ = _get_db_functions()
+                    new_ids = await bulk_upsert_fn(combo_results)
+                    if new_ids:
+                        async with self._seen_ids_lock:
+                            self._seen_ids.extend(new_ids)
+                except Exception as e:
+                    await log.aerror("combo_bulk_upsert_failed", combo=combo_key, error=str(e))
+
             async with self._results_lock:
                 self._all_scholarships.extend(combo_results)
 
@@ -362,16 +374,6 @@ class IDPScholarshipScraper(BaseScraper):
                     continue
 
                 scholarships.append(scholarship)
-
-                if self.save_to_db:
-                    try:
-                        upsert_fn, _ = _get_db_functions()
-                        result = await upsert_fn(scholarship)
-                        if result and result.get("id"):
-                            async with self._seen_ids_lock:
-                                self._seen_ids.append(result["id"])
-                    except Exception:
-                        pass  # already logged
 
             # If we got fewer than a full page, we've hit the last page
             if len(cards) < CARDS_PER_PAGE:

@@ -29,6 +29,7 @@ from src.database.models import University
 
 # Lazy DB imports
 _upsert_university = None
+_bulk_upsert_university = None
 
 
 def _get_upsert_fn():
@@ -37,6 +38,14 @@ def _get_upsert_fn():
         from src.database.queries import upsert_university
         _upsert_university = upsert_university
     return _upsert_university
+
+
+def _get_bulk_upsert_fn():
+    global _bulk_upsert_university
+    if _bulk_upsert_university is None:
+        from src.database.queries import bulk_upsert_universities
+        _bulk_upsert_university = bulk_upsert_universities
+    return _bulk_upsert_university
 
 
 log = structlog.get_logger().bind(scraper="IDPUniversityScraper")
@@ -389,14 +398,6 @@ class IDPUniversityScraper(BaseScraper):
         async def _process_stub(stub):
             detail = await self._fetch_detail(stub["profile_url"])
             university = self._build_university(stub, detail)
-            if university is None:
-                return None
-            if self.save_to_db:
-                try:
-                    upsert_fn = _get_upsert_fn()
-                    await upsert_fn(university)
-                except Exception:
-                    pass
             return university
 
         batch_size = 20
@@ -408,9 +409,16 @@ class IDPUniversityScraper(BaseScraper):
             
             tasks = [_process_stub(s) for s in batch]
             results = await asyncio.gather(*tasks)
-            for res in results:
-                if res:
-                    universities.append(res)
+            valid_results = [res for res in results if res]
+            
+            if self.save_to_db and valid_results:
+                try:
+                    bulk_upsert_fn = _get_bulk_upsert_fn()
+                    await bulk_upsert_fn(valid_results)
+                except Exception as e:
+                    await log.aerror("batch_bulk_upsert_failed", error=str(e), count=len(valid_results))
+
+            universities.extend(valid_results)
 
         await log.ainfo("scrape_complete", total=len(universities))
         await self.close()
