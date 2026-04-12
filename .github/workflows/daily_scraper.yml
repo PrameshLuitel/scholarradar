@@ -2,8 +2,8 @@ name: Daily Supabase Scraper
 
 on:
   schedule:
-    # Runs at 00:00 UTC every day.
-    - cron: '0 0 * * *'
+    # Runs at 00:00 UTC every 3 days to save GitHub Actions minutes.
+    - cron: '0 0 */3 * *'
   workflow_dispatch:
     # Allows manual trigger from the Actions tab in GitHub
 
