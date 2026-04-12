@@ -200,14 +200,14 @@ class IDPScholarshipScraper(BaseScraper):
     """
 
     # Concurrency settings
-    MAX_CONCURRENT_COMBOS = 8
-    DETAIL_BATCH_SIZE = 12
+    MAX_CONCURRENT_COMBOS = 4
+    DETAIL_BATCH_SIZE = 6
     CHECKPOINT_FILE = ".scholarship_scraper_checkpoint.json"
 
     def __init__(
         self,
         save_to_db: bool = True,
-        rate_limit_interval: float = 0.15,
+        rate_limit_interval: float = 0.5,
         locale: str = LOCALE,
     ):
         super().__init__(BASE_URL, rate_limit_interval=rate_limit_interval)

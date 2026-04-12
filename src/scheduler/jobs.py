@@ -139,15 +139,9 @@ async def scrape_all_databases():
         courses_scraper = IDPCourseScraper(save_to_db=True)
         universities_scraper = IDPUniversityScraper(save_to_db=True)
 
-        heavy_results = await asyncio.gather(
-            _run_async_scraper("idp_scholarships", scholarships_scraper),
-            _run_async_scraper("idp_courses", courses_scraper, clear_checkpoint=True),
-            _run_async_scraper("idp_universities", universities_scraper),
-        )
-
-        counts["idp_scholarships"] = heavy_results[0]
-        counts["idp_courses"] = heavy_results[1]
-        counts["idp_universities"] = heavy_results[2]
+        counts["idp_scholarships"] = await _run_async_scraper("idp_scholarships", scholarships_scraper)
+        counts["idp_courses"] = await _run_async_scraper("idp_courses", courses_scraper, clear_checkpoint=True)
+        counts["idp_universities"] = await _run_async_scraper("idp_universities", universities_scraper)
 
         heavy_elapsed = round(time.time() - job_start, 1)
         log.info("group_complete", group="heavy", elapsed_seconds=heavy_elapsed, counts={

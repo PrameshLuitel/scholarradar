@@ -369,7 +369,7 @@ class IDPUniversityScraper(BaseScraper):
     def __init__(
         self,
         save_to_db: bool = True,
-        rate_limit_interval: float = 0.2,
+        rate_limit_interval: float = 0.5,
         locale: str = LOCALE,
     ):
         super().__init__(BASE_URL, rate_limit_interval=rate_limit_interval)
@@ -400,7 +400,7 @@ class IDPUniversityScraper(BaseScraper):
             university = self._build_university(stub, detail)
             return university
 
-        batch_size = 20
+        batch_size = 10
         for i in range(0, total, batch_size):
             batch = uni_stubs[i:i + batch_size]
             pct = round((i / total) * 100, 1) if total else 0
