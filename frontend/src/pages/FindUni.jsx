@@ -859,14 +859,14 @@ export default function FindUni() {
 
                     {/* Legal Disclaimer Block */}
                     <div className="p-8 rounded-[2rem] bg-gray-50 border border-gray-100 text-center">
-                       <ShieldCheck className="w-8 h-8 text-blue-600 mx-auto mb-4" />
-                       <h4 className="font-serif text-xl font-medium text-gray-900 mb-3 text-center">Our Commitment to Transparency</h4>
+                       <ShieldCheck className="w-8 h-8 text-gray-400 mx-auto mb-4" />
+                       <h4 className="font-serif text-xl font-medium text-gray-900 mb-3 text-center">Estimate-Only Tool</h4>
                        <p className="text-sm text-gray-500 leading-relaxed max-w-2xl mx-auto mb-5 italic">
-                         "Skolr is an AI technology connection tool. We are not migration agents, registered legal advisors, or authorized educational consultants. We provide a bridge between you and official university/government data so you can make decisions without middlemen. This service is for informational purposes only—verify everything on our links."
+                         "Skolr is just a data aggregator. We are nothing—no agents, no migration advisors, and no legal counsellors. We provide no professional advice. This tool is strictly for estimates and informational exploration. Always verify critical data on official university or government websites."
                        </p>
                        <div className="flex items-center justify-center gap-4">
-                         <span className="px-3 py-1 rounded-full bg-white border border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Legal AI Proxy</span>
-                         <span className="px-3 py-1 rounded-full bg-white border border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-widest">100% Commissions-Free</span>
+                         <span className="px-3 py-1 rounded-full bg-white border border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pure Data Proxy</span>
+                         <span className="px-3 py-1 rounded-full bg-white border border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Informational Estimates Only</span>
                        </div>
                     </div>
                   </div>
