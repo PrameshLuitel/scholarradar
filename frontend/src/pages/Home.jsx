@@ -243,9 +243,9 @@ export default function Home() {
               <p className="text-gray-500 font-light leading-relaxed mb-6">Our daily scrapers pull directly from the most authoritative databases in global education.</p>
               <div className="flex flex-wrap gap-2">
                 <span className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-600">IDP Connect</span>
-                <span className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-600">CRICOS (AU)</span>
-                <span className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-600">Gov.UK</span>
-                <span className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-600">Official Uni Pages</span>
+                <span className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-600">CRICOS (data.gov.au)</span>
+                <span className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-600">StudyAustralia.gov.au</span>
+                <span className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-600">PhD Seeker</span>
               </div>
             </div>
 
