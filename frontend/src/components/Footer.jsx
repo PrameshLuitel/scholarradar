@@ -35,6 +35,7 @@ export default function Footer() {
             <Link to="/ip-infringement" className="text-gray-500 hover:text-black font-light transition-colors text-sm">IP Infringement</Link>
           </div>
         </div>
+      </div>
       <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-gray-50 flex flex-col items-center">
         <div className="max-w-4xl w-full bg-gray-50/50 border border-gray-100 rounded-3xl p-6 md:p-8 text-center shadow-inner">
           <p className="text-xs md:text-sm text-gray-500 font-light leading-relaxed">
@@ -50,7 +51,6 @@ export default function Footer() {
           &copy; {new Date().getFullYear()} Skolr. All rights reserved.
         </p>
       </div>
-    </div>
-  </footer>
-);
+    </footer>
+  );
 }
