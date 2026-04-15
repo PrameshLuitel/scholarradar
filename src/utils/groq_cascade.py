@@ -85,7 +85,7 @@ async def stream_groq_response(
         log.info("groq_cascade_trying", model=model)
 
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=180.0) as client:
                 response = await client.post(
                     GROQ_API_URL,
                     headers={

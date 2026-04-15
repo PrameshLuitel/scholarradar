@@ -386,8 +386,8 @@ export default function FindUni() {
   // ── Submit ──────────────────────────────────────────────────────────
 
   const handleSubmit = async () => {
-    if (!profile.nationality || !profile.target_subject || profile.preferred_countries.length === 0) {
-      setError('Please fill in your nationality, target subject, and select at least one country.');
+    if (!profile.nationality || profile.preferred_countries.length === 0) {
+      setError('Please fill in your nationality and select at least one country.');
       return;
     }
 
@@ -463,7 +463,7 @@ export default function FindUni() {
     setCourses([]); setScholarships([]); setError(null); setIsAnalyzing(false);
   };
 
-  const isValid = profile.nationality && profile.target_subject && profile.preferred_countries.length > 0;
+  const isValid = profile.nationality && profile.preferred_countries.length > 0;
   const showResults = responseText || isAnalyzing || courses.length > 0;
 
   // ── Render ──────────────────────────────────────────────────────────
@@ -591,7 +591,7 @@ export default function FindUni() {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
                 <div className="relative">
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Target Subject *</label>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Target Subject</label>
                   <input type="text" placeholder="e.g. Computer Science, MBA..." className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all" value={profile.target_subject} onChange={e => onSubjectChange(e.target.value)} onBlur={() => setTimeout(() => setSuggestions([]), 200)} />
                   {suggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-20 bg-white border border-gray-200 rounded-xl mt-1 shadow-lg overflow-hidden">
@@ -622,7 +622,7 @@ export default function FindUni() {
               {/* Budget */}
               <div className="mb-2">
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  Total Budget: <span className="text-gray-900 text-base font-bold ml-1">USD ${parseInt(profile.budget_usd).toLocaleString()}</span>
+                  Total Budget (entire course): <span className="text-gray-900 text-base font-bold ml-1">USD ${parseInt(profile.budget_usd).toLocaleString()}</span>
                 </label>
                 <input type="range" min="5000" max="200000" step="5000" className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" value={profile.budget_usd} onChange={e => update('budget_usd', e.target.value)} />
                 <div className="flex justify-between text-[10px] text-gray-400 mt-1"><span>$5K</span><span>$50K</span><span>$100K</span><span>$200K</span></div>
