@@ -1,27 +1,56 @@
 import React from 'react';
-import { Network, Search, FileText, Zap, ArrowRight, Box } from 'lucide-react';
+import { Network, Search, FileText, Zap, ArrowRight, Box, ShieldCheck, AlertCircle, Info } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function Home() {
+  const fadeInUp = {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.6, ease: "easeOut" }
+  };
+
+  const stagger = {
+    animate: {
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
   return (
     <>
-      <section className="relative pt-24 pb-16 md:pt-32 md:pb-20 lg:pt-44 lg:pb-32 overflow-hidden">
+      <section className="relative pt-16 pb-12 md:pt-20 md:pb-16 lg:pt-32 lg:pb-24 overflow-hidden">
         <div 
           className="absolute inset-0 z-0 opacity-[0.05] pointer-events-none" 
           style={{ backgroundImage: `url('/images/data_texture.png')`, backgroundSize: 'cover', backgroundPosition: 'center' }}
         ></div>
         
         <div className="max-w-7xl mx-auto px-5 relative z-10 flex flex-col lg:flex-row items-center gap-10 lg:gap-16">
-          <div className="flex-1 text-center lg:text-left">
-            <h1 className="font-serif text-5xl sm:text-6xl md:text-8xl font-medium tracking-normal text-gray-900 mb-6 md:mb-8 leading-[1.05]">
+          <motion.div 
+            initial="initial"
+            animate="animate"
+            variants={stagger}
+            className="flex-1 text-center lg:text-left"
+          >
+            <motion.h1 
+              variants={fadeInUp}
+              className="font-serif text-5xl sm:text-6xl md:text-8xl font-medium tracking-normal text-gray-900 mb-6 md:mb-8 leading-[1.05]"
+            >
               The moment your AI<br />
               <span className="italic text-gray-500">stops guessing.</span>
-            </h1>
+            </motion.h1>
             
-            <p className="text-lg md:text-xl lg:text-2xl text-gray-500 mb-8 md:mb-10 max-w-xl font-light leading-relaxed mx-auto lg:mx-0">
+            <motion.p 
+              variants={fadeInUp}
+              className="text-lg md:text-xl lg:text-2xl text-gray-500 mb-8 md:mb-10 max-w-xl font-light leading-relaxed mx-auto lg:mx-0"
+            >
               Skolr connects any AI to live university data from 30+ countries. Programs, scholarships, deadlines, visa rules. Scraped daily from official sources. Free. One URL to start.
-            </p>
+            </motion.p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 md:gap-5">
+            <motion.div 
+              variants={fadeInUp}
+              className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 md:gap-5"
+            >
               <a href="#connect" className="w-full sm:w-auto relative group overflow-hidden px-8 py-4 text-base font-medium text-white bg-blue-600 rounded-full shadow-[0_8px_30px_rgb(37,99,235,0.4)] hover:shadow-[0_8px_30px_rgb(37,99,235,0.6)] transition-all hover:-translate-y-1 active:translate-y-0 border border-blue-400/30 ring-1 ring-inset ring-white/20 flex items-center justify-center gap-2">
                 <span className="relative z-10 flex items-center gap-2 drop-shadow-sm">Connect Now <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform"/></span>
                 <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent opacity-50 rounded-full pointer-events-none"></div>
@@ -29,21 +58,29 @@ export default function Home() {
               <a href="#features" className="text-base font-medium text-gray-500 hover:text-black transition-colors border-b border-transparent hover:border-black pb-1">
                 See what it can do
               </a>
-            </div>
+            </motion.div>
             
-            <p className="mt-6 text-[10px] text-gray-400 font-light max-w-md mx-auto lg:mx-0">
+            <motion.p 
+              variants={fadeInUp}
+              className="mt-6 text-[10px] text-gray-400 font-light max-w-md mx-auto lg:mx-0"
+            >
               *Skolr is an AI data proxy. Not professional advice. Verify all data on official university or government sites.
-            </p>
-          </div>
+            </motion.p>
+          </motion.div>
           
-          <div className="flex-1 relative w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-none mt-4 lg:mt-0">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+            className="flex-1 relative w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-none mt-4 lg:mt-0"
+          >
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-blue-400/10 blur-[120px] rounded-full pointer-events-none"></div>
             <img 
               src="/images/skolr_hero_art_2.png" 
               alt="Skolr University Architecture" 
               className="relative z-10 w-full h-auto drop-shadow-2xl rounded-[2rem] md:rounded-[3rem] object-cover aspect-square md:aspect-[4/3] border border-white/50 shadow-[0_20px_50px_rgba(0,0,0,0.1)]"
             />
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -73,35 +110,47 @@ export default function Home() {
           </div>
           
           <div className="grid md:grid-cols-3 gap-5 md:gap-8">
-            <div className="md:col-span-2 bg-white p-6 md:p-12 rounded-3xl md:rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden group">
+            <motion.div 
+              whileHover={{ y: -5 }}
+              className="md:col-span-2 bg-white p-6 md:p-12 rounded-3xl md:rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden group"
+            >
               <div className="absolute -right-20 -top-20 w-64 h-64 bg-blue-50 rounded-full blur-3xl group-hover:bg-blue-100 transition-colors"></div>
               <div className="relative z-10">
                 <Search className="w-7 h-7 md:w-8 md:h-8 text-blue-600 mb-5 md:mb-8" />
                 <h3 className="text-2xl md:text-3xl font-serif font-medium mb-3 md:mb-4">Course Search</h3>
                 <p className="text-gray-500 text-base md:text-lg max-w-md font-light leading-relaxed">Search across 5,000+ programs from universities in the US, UK, Canada, Australia, and beyond. Get tuition fees, deadlines, entry requirements, and direct application links. Data refreshed daily from official university pages.</p>
               </div>
-            </div>
+            </motion.div>
             
-            <div className="bg-gray-900 text-white p-6 md:p-12 rounded-3xl md:rounded-[2.5rem] shadow-xl relative overflow-hidden group">
+            <motion.div 
+              whileHover={{ y: -5 }}
+              className="bg-gray-900 text-white p-6 md:p-12 rounded-3xl md:rounded-[2.5rem] shadow-xl relative overflow-hidden group"
+            >
               <div className="absolute inset-0 opacity-20 transition-opacity group-hover:opacity-40" style={{ backgroundImage: `url('/images/data_texture.png')`, backgroundSize: 'cover' }}></div>
               <div className="relative z-10 h-full flex flex-col">
                 <Zap className="w-7 h-7 md:w-8 md:h-8 text-blue-400 mb-5 md:mb-8" />
                 <h3 className="text-2xl md:text-3xl font-serif font-medium mb-3 md:mb-4">Scholarship Finder</h3>
                 <p className="text-gray-300 text-base md:text-lg font-light leading-relaxed mb-auto">Surface scholarships that never show up on Google. Government grants, university-specific funding, and regional awards matched to your profile, nationality, and field of study.</p>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-white p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-gray-100 shadow-sm hover:border-gray-200 transition-colors">
+            <motion.div 
+              whileHover={{ y: -5 }}
+              className="bg-white p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-gray-100 shadow-sm hover:border-gray-200 transition-colors"
+            >
               <FileText className="w-6 h-6 md:w-7 md:h-7 text-gray-900 mb-5 md:mb-6" />
               <h3 className="text-xl md:text-2xl font-serif font-medium mb-2 md:mb-3">Visa Intelligence</h3>
               <p className="text-gray-500 text-sm md:text-base font-light leading-relaxed">Student visa requirements, post-study work rights, and processing timelines pulled from official immigration sources. No agency spin.</p>
-            </div>
+            </motion.div>
 
-            <div className="md:col-span-2 bg-gradient-to-br from-[#f0f4ff] to-white p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-blue-50 flex flex-col justify-center">
+            <motion.div 
+              whileHover={{ y: -5 }}
+              className="md:col-span-2 bg-gradient-to-br from-[#f0f4ff] to-white p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-blue-50 flex flex-col justify-center"
+            >
               <Network className="w-6 h-6 md:w-7 md:h-7 text-blue-600 mb-5 md:mb-6" />
               <h3 className="text-xl md:text-2xl font-serif font-medium mb-2 md:mb-3 text-gray-900">Works with any AI</h3>
               <p className="text-gray-500 text-sm md:text-base font-light max-w-xl leading-relaxed">Built on the open Model Context Protocol. Connects natively to Claude, ChatGPT, Gemini, Cursor, and any MCP-compatible tool. No API keys. No authentication. Just paste the URL and go.</p>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>
@@ -174,6 +223,54 @@ export default function Home() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="safety" className="py-16 md:py-32 px-5 bg-blue-50/50 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-12">
+          <div className="flex-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold uppercase tracking-widest mb-6">
+              <ShieldCheck className="w-4 h-4"/> Legal & Data Integrity
+            </div>
+            <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-medium text-gray-900 mb-6 font-serif">
+              Built for accuracy, <br/><span className="italic text-gray-500">grounded in transparency.</span>
+            </h2>
+            <div className="space-y-6">
+              <div className="flex gap-4">
+                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm shrink-0">
+                  <AlertCircle className="w-5 h-5 text-blue-600"/>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-1">Not a Migration Agent</h4>
+                  <p className="text-gray-500 text-sm font-light leading-relaxed">Skolr is an AI data proxy. We are not migration agents, lawyers, or authorized counsellors. We do not provide professional advice.</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm shrink-0">
+                  <Zap className="w-5 h-5 text-blue-600"/>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-1">Real-time Verified Data</h4>
+                  <p className="text-gray-500 text-sm font-light leading-relaxed">Our data is scraped directly from university and government primary sources every 24 hours. No manual data entry errors.</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm shrink-0">
+                  <Info className="w-5 h-5 text-blue-600"/>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-1">Verify Source Links</h4>
+                  <p className="text-gray-500 text-sm font-light leading-relaxed">Every result comes with a direct link to the official page. Students must verify critical info on those sources before acting.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex-1 bg-white p-8 md:p-12 rounded-[2.5rem] shadow-xl border border-blue-100 flex flex-col justify-center border-t-8 border-t-blue-600">
+             <blockquote className="text-xl md:text-2xl font-serif italic text-gray-800 leading-relaxed mb-6">
+               "Students deserve data without the agency gatekeeping. We don't hide the truth or take commissions. We just serve the data."
+             </blockquote>
+             <p className="text-gray-400 font-medium">— The Skolr Open Mission</p>
           </div>
         </div>
       </section>

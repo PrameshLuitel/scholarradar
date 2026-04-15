@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 export default function Header() {
   return (
-    <header className="absolute top-0 w-full z-50 bg-transparent">
+    <header className="absolute top-[36px] md:top-[40px] w-full z-50 bg-transparent">
       <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
         <Link to="/" className="flex items-center font-bold text-2xl tracking-tighter">
           Skolr<span className="text-blue-600 -ml-0.5 tracking-tighter">.</span>
