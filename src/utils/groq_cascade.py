@@ -62,8 +62,11 @@ def _get_api_key() -> str:
 async def stream_groq_response(
     system_prompt: str,
     user_prompt: str,
+    messages: Optional[list[dict]] = None,
     max_tokens: int = 4096,
     temperature: float = 0.7,
+    tools: Optional[list[dict]] = None,
+    tool_choice: Optional[str | dict] = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Stream a response from Groq, cascading through models on failure.
@@ -76,10 +79,14 @@ async def stream_groq_response(
     """
     api_key = _get_api_key()
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
+    if messages is None:
+        final_messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+    else:
+        # If full history provided, just use it
+        final_messages = messages
 
     last_error = None
 
@@ -88,19 +95,34 @@ async def stream_groq_response(
 
         try:
             async with httpx.AsyncClient(timeout=180.0) as client:
+                payload = {
+                    "model": model,
+                    "messages": final_messages,
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                    "stream": True,
+                }
+                
+                if tools:
+                    payload["tools"] = tools
+                if tool_choice:
+                    payload["tool_choice"] = tool_choice
+                
+                # Special Compound AI native tool activation
+                if model == "groq/compound":
+                    payload["compound_custom"] = {
+                        "tools": {
+                            "enabled_tools": ["web_search", "code_interpreter", "visit_website"]
+                        }
+                    }
+
                 response = await client.post(
                     GROQ_API_URL,
                     headers={
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
                     },
-                    json={
-                        "model": model,
-                        "messages": messages,
-                        "max_tokens": max_tokens,
-                        "temperature": temperature,
-                        "stream": True,
-                    },
+                    json=payload,
                 )
 
                 if response.status_code in RETRY_STATUS_CODES:
@@ -140,7 +162,16 @@ async def stream_groq_response(
 
                     try:
                         chunk = json.loads(data_str)
-                        delta = chunk.get("choices", [{}])[0].get("delta", {})
+                        choices = chunk.get("choices", [{}])
+                        if not choices:
+                            continue
+                        
+                        delta = choices[0].get("delta", {})
+                        
+                        # Handle tool calls in stream
+                        if "tool_calls" in delta:
+                            yield {"type": "tool_call", "tool_calls": delta["tool_calls"]}
+                        
                         content = delta.get("content", "")
 
                         # Check for usage in the final chunk
@@ -202,8 +233,10 @@ async def stream_groq_response(
 async def non_streaming_groq(
     system_prompt: str,
     user_prompt: str,
+    messages: Optional[list[dict]] = None,
     max_tokens: int = 4096,
     temperature: float = 0.7,
+    tools: Optional[list[dict]] = None,
 ) -> dict:
     """
     Non-streaming version — returns the full response at once.
@@ -211,16 +244,24 @@ async def non_streaming_groq(
     """
     full_content = ""
     result = {}
+    tool_calls = []
 
-    async for event in stream_groq_response(system_prompt, user_prompt, max_tokens, temperature):
+    async for event in stream_groq_response(
+        system_prompt, user_prompt, messages, max_tokens, temperature, tools
+    ):
         if event["type"] == "chunk":
             full_content += event["content"]
+        elif event["type"] == "tool_call":
+            # Very basic aggregation of tool call deltas
+            tool_calls.extend(event["tool_calls"])
         elif event["type"] == "done":
             result = event
         elif event["type"] == "error":
             return {"error": event["message"]}
 
     result["content"] = full_content
+    if tool_calls:
+        result["tool_calls"] = tool_calls
     return result
 
 

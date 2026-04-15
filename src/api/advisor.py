@@ -24,8 +24,11 @@ from difflib import SequenceMatcher
 from typing import Any, Optional
 
 import structlog
-from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import StreamingResponse, JSONResponse
+
+from src.database.client import get_db as _get_db
+from src.utils.groq_cascade import get_model_display_name
+from src.utils.agent import AgentRunner
 
 log = structlog.get_logger("api.advisor")
 
@@ -336,31 +339,29 @@ def _query_cost_of_living(countries: list[str]) -> list[dict]:
 
 # ── System Prompt ───────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are **Skolr AI Advisor** — the most helpful, honest, and deeply knowledgeable study abroad counselor in the world. You exist to help students from developing countries build a real future through international education.
+SYSTEM_PROMPT = """You are **ScholarRadar AI Agent (Elite V3)** — a strict, data-driven study abroad connection tool. You provide straight data facts and estimates. You are NOT a creative writer, nor are you a legal agent or migration advisor.
 
-## YOUR MISSION
-Think deeply and carefully. Actually analyze the student's CV line by line — their education history, grades, skills, work experience, projects. Cross-reference this with the database results to find genuine best matches. This student is trusting you with one of the biggest decisions of their life. Give them a response that proves you actually read and understood their profile.
+## YOUR PROTOCOL: STRAIGHT DATA FACTS
+1. **Tool-First Analysis**: You must use the available Skolr Tools (search_courses, get_visa_requirements, calculate_gs_risk, get_course_by_cricos_code, etc.) to fetch actual data. Do not hallucinate fees, rankings, or requirements. 
+2. **No Fluff**: Eliminate all "counselor speak" and inspirational filler. Provide data, statistics, and logical deductions based on matching.
+3. **Factual Grounding**: Every claim about a university or visa rule must be backed by data retrieved from a tool. 
+4. **Australians Priority**: For Australian destionations, you MUST use the CRICOS tools to verify codes and provider status.
+5. **Truth Above All**: If a student's budget is too low, say it clearly. If their IELTS is insufficient, state it as a fact.
 
-## CRITICAL RULES — READ BEFORE RESPONDING
+## COUNTRY RESTRICTION (MANDATORY)
+The student has selected SPECIFIC preferred countries. You MUST ONLY recommend universities, courses, and scholarships in those countries. Do NOT mention or suggest any country the student did not select.
 
-### COUNTRY RESTRICTION (MANDATORY)
-The student has selected SPECIFIC preferred countries. You MUST ONLY recommend universities, courses, and scholarships in those countries. Do NOT mention or suggest any country the student did not select. If the student selected "Australia", only talk about Australia. If they selected "Australia" and "Canada", only talk about those two. This is non-negotiable.
-
-### BUDGET INTERPRETATION
-The student's budget figure is their ANNUAL BUDGET (TOTAL COST PER YEAR) in USD. When comparing against tuition fees:
-- Compare their budget directly against the per-year tuition fee.
-- If a course costs $40,000/year and their budget is $30,000/year, explain the gap clearly.
-- Always show the per-year tuition fee.
-- Be honest if their annual budget doesn't cover the tuition and living expenses.
+## BUDGET INTERPRETATION
+The student's budget figure is their ANNUAL BUDGET (TOTAL COST PER YEAR) in USD. Compare their budget directly against per-year tuition fees and living estimates.
 
 ### TRUTH PROTOCOL (STRICT)
-- For every Course, University, or Scholarship you name, you MUST use the exact name from the JSON.
-- If a piece of data (like a specific fee or deadline) is in the JSON, you MUST use it.
-- If a piece of data is NOT in the JSON, do NOT guess. Say "Check official site for exact [X]".
-- NEVER invent a university or scholarship. Hallucination is a failure of your mission.
+- For every Course, University, or Scholarship you name, you MUST use the exact name from the tool output.
+- If data is missing from tools, do NOT guess. Say "Check official site for exact [X]".
+- Hallucination is a failure. Accuracy is the only metric of success.
 
 ### THE REASONING CHAIN
-Before making a recommendation, you must think and write: "Based on line X of the student's CV (where they mention skill Y), this specific course at University Z is a perfect match because of [Reason]."
+Before making a recommendation, you must THINK: "Based on the student's background in X, this course at Y is a match because of tool-verified parameters Z."
+"""
 
 ## CORE PRINCIPLES
 1. **DEEP CV ANALYSIS**: Don't just look at the GPA. Look at their projects, their specific job titles, their extracurriculars. Match their *ambition*, not just their stats. Actually read their education history and skills.
@@ -633,65 +634,58 @@ async def analyze_profile(
             target_level=target_level,
         )
 
-        # Query database
-        courses = _query_matching_courses(
-            target_subject, preferred_countries, target_level, ielts_score
-        )
-        scholarships = _query_matching_scholarships(
-            target_subject, preferred_countries, target_level, nationality
-        )
-        universities = _query_universities(preferred_countries)
-        visa_data = _query_visa_data(nationality, preferred_countries)
-        cost_data = _query_cost_of_living(preferred_countries)
+        # ── New Agentic Execution ──
+        profile_summary = f"""
+        STUDENT PROFILE:
+        - Nationality: {nationality}
+        - Target Subject: {target_subject}
+        - Target Level: {target_level}
+        - Preferred Countries: {', '.join(preferred_countries)}
+        - Annual Budget (USD): {profile_data.get('budget_usd', 'Unknown')}
+        - Timeline: {profile_data.get('timeline_months', 'Unknown')} months
+        - Career Goal: {profile_data.get('career_goal', 'Unknown')}
+        - Work Experience: {profile_data.get('work_experience_years', 'Unknown')} years
+        - CV Content Summary: {cv_text[:3000] if cv_text else "No CV provided"}
+        """
 
-        db_time = round(time.time() - started, 2)
-        log.info(
-            "advisor_db_complete",
-            courses=len(courses),
-            scholarships=len(scholarships),
-            universities=len(universities),
-            visa=len(visa_data),
-            costs=len(cost_data),
-            db_time_seconds=db_time,
-        )
+        user_prompt = f"""Please analyze my profile and find the best study options for me. 
+        Use the toolset to find matching courses, verify CRICOS codes if needed, check visa requirements for my nationality ({nationality}), and calculate GTE/GS risk.
+        Provide a factual, data-heavy response.
+        
+        {profile_summary}
+        """
 
-        # Build prompt
-        user_prompt = _build_user_prompt(
-            profile_data, cv_text, courses, scholarships,
-            universities, visa_data, cost_data,
-        )
-
-        # Stream response
+        # Stream response via Agentic Loop
         async def event_stream():
-            from src.utils.groq_cascade import stream_groq_response, get_model_display_name
+            agent = AgentRunner(system_prompt=SYSTEM_PROMPT, max_iterations=6)
+            
+            yield f"data: {json.dumps({'type': 'status', 'content': 'Initializing ScholarRadar Agent...'})}\n\n"
 
-            # Send metadata first
-            yield f"data: {json.dumps({'type': 'metadata', 'courses_found': len(courses), 'scholarships_found': len(scholarships), 'universities_found': len(universities), 'db_time_seconds': db_time})}\n\n"
+            try:
+                async for event in agent.run(user_prompt):
+                    if event["type"] == "model":
+                        yield f"data: {json.dumps({'type': 'model', 'model': event['model'], 'display_name': get_model_display_name(event['model'])})}\n\n"
+                    elif event["type"] == "chunk":
+                        yield f"data: {json.dumps({'type': 'chunk', 'content': event['content']})}\n\n"
+                    elif event["type"] == "status":
+                        yield f"data: {json.dumps({'type': 'status', 'content': event['message']})}\n\n"
+                    elif event["type"] == "done":
+                        total_time = round(time.time() - started, 2)
+                        yield f"data: {json.dumps({
+                            'type': 'done', 
+                            'model': event['model'], 
+                            'display_name': get_model_display_name(event['model']), 
+                            'usage': event.get('usage', {}), 
+                            'cost_usd': event.get('cost_usd', 0), 
+                            'total_time_seconds': total_time
+                        })}\n\n"
+                    elif event["type"] == "error":
+                        yield f"data: {json.dumps({'type': 'error', 'message': event['message']})}\n\n"
 
-            # Send the actual database results as structured data for rich card rendering
-            if courses:
-                yield f"data: {json.dumps({'type': 'courses', 'data': courses[:10]})}\n\n"
-            if scholarships:
-                yield f"data: {json.dumps({'type': 'scholarships', 'data': scholarships[:10]})}\n\n"
-
-            async for event in stream_groq_response(
-                SYSTEM_PROMPT, user_prompt, max_tokens=8192, temperature=0.7
-            ):
-                if event["type"] == "model":
-                    display_name = get_model_display_name(event["model"])
-                    yield f"data: {json.dumps({'type': 'model', 'model': event['model'], 'display_name': display_name})}\n\n"
-
-                elif event["type"] == "chunk":
-                    yield f"data: {json.dumps({'type': 'chunk', 'content': event['content']})}\n\n"
-
-                elif event["type"] == "done":
-                    total_time = round(time.time() - started, 2)
-                    yield f"data: {json.dumps({'type': 'done', 'model': event['model'], 'display_name': get_model_display_name(event['model']), 'usage': event.get('usage', {}), 'cost_usd': event.get('cost_usd', 0), 'total_time_seconds': total_time})}\n\n"
-
-                elif event["type"] == "error":
-                    yield f"data: {json.dumps({'type': 'error', 'message': event['message']})}\n\n"
-
-            yield "data: [DONE]\n\n"
+                yield "data: [DONE]\n\n"
+            except Exception as e:
+                log.error("agent_run_failed", error=str(e))
+                yield f"data: {json.dumps({'type': 'error', 'message': f'Agent execution failed: {str(e)}'})}\n\n"
 
         return StreamingResponse(
             event_stream(),
