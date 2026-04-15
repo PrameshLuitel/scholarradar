@@ -4,7 +4,7 @@ import {
   Upload, FileText, GraduationCap, Globe, DollarSign,
   Send, Sparkles, X, CheckCircle, AlertCircle, Loader2,
   ArrowRight, BookOpen, Target, Brain, Clock, Award,
-  Info, Zap, ExternalLink, MapPin, Calendar, TrendingUp
+  Info, Zap, ExternalLink, MapPin, Calendar, TrendingUp, ShieldCheck
 } from 'lucide-react';
 
 // ── Data ────────────────────────────────────────────────────────────────────
@@ -46,20 +46,42 @@ const SUBJECT_SUGGESTIONS = [
 
 function CourseCard({ course, index }) {
   const relevance = Math.round((course.relevance || 0) * 100);
+  const showCodes = course.country?.toLowerCase() === 'australia' && (course.cricos_code || course.provider_code);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.06, duration: 0.3 }}
-      className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md transition-shadow group"
+      transition={{ delay: index * 0.05, duration: 0.3 }}
+      className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md transition-shadow group relative overflow-hidden"
     >
-      <div className="flex items-start justify-between gap-3 mb-3">
+      {/* Reasoning Badge */}
+      <div className="flex items-center gap-1.5 mb-3">
+        <div className="px-2 py-0.5 rounded-full bg-purple-50 border border-purple-100 text-[10px] font-bold text-purple-600 uppercase tracking-tight flex items-center gap-1">
+          <Sparkles className="w-2.5 h-2.5" />
+          Elite Insight
+        </div>
+        <span className="text-[11px] font-medium text-gray-500 italic">{course.match_reason}</span>
+      </div>
+
+      <div className="flex items-start justify-between gap-3 mb-4">
         <div className="flex-1 min-w-0">
           <h4 className="font-semibold text-gray-900 text-sm leading-snug mb-1 line-clamp-2">{course.name}</h4>
-          <p className="text-xs text-gray-500 flex items-center gap-1">
-            <MapPin className="w-3 h-3 flex-shrink-0" />
-            {course.university}{course.city && `, ${course.city}`}
+          <p className="text-xs text-gray-500 font-medium flex items-center gap-1">
+            {course.university}
           </p>
+          <div className="flex items-center gap-2 mt-1">
+             <p className="text-[10px] text-gray-400 flex items-center gap-1 uppercase tracking-wider">
+               <MapPin className="w-2.5 h-2.5" />
+               {course.city}{course.state && `, ${course.state}`}
+             </p>
+             {showCodes && (
+               <div className="flex items-center gap-1.5 ml-auto">
+                 {course.cricos_code && <span className="text-[9px] bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded border border-gray-100 font-mono">CRICOS: {course.cricos_code}</span>}
+                 {course.provider_code && <span className="text-[9px] bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded border border-gray-100 font-mono">PROV: {course.provider_code}</span>}
+               </div>
+             )}
+          </div>
         </div>
         <div className="flex-shrink-0">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold ${
@@ -72,34 +94,31 @@ function CourseCard({ course, index }) {
         </div>
       </div>
 
-      <div className="flex items-center flex-wrap gap-2 mb-3">
+      <div className="flex items-center flex-wrap gap-2 mb-4">
         {course.country && (
-          <span className="px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 text-[11px] font-medium">{course.country}</span>
+          <span className="px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 text-[10px] font-bold uppercase tracking-wider">{course.country}</span>
         )}
         {course.level && (
-          <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-medium capitalize">{course.level}</span>
+          <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-wider">{course.level}</span>
         )}
         {course.duration_months && (
-          <span className="px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 text-[11px] font-medium">{course.duration_months} months</span>
-        )}
-        {course.ielts_met === false && (
-          <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-600 text-[11px] font-medium">IELTS not met</span>
+          <span className="px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 text-[10px] font-bold uppercase tracking-wider">{course.duration_months} months</span>
         )}
         {course.ielts_met === true && course.ielts_required && (
-          <span className="px-2 py-0.5 rounded-md bg-green-50 text-green-700 text-[11px] font-medium">IELTS ✓ ({course.ielts_required})</span>
+          <span className="px-2 py-0.5 rounded-md bg-green-50 text-green-700 text-[10px] font-bold uppercase tracking-wider">IELTS ✓ ({course.ielts_required})</span>
         )}
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pt-3 border-t border-gray-50">
         <span className="text-sm font-bold text-gray-900">{course.tuition_display || 'Contact university'}</span>
         {(course.apply_url || course.source_url) && (
           <a
             href={course.apply_url || course.source_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs text-blue-600 font-medium hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-[11px] font-bold hover:bg-black transition-colors"
           >
-            View <ExternalLink className="w-3 h-3" />
+            Apply <ExternalLink className="w-3 h-3" />
           </a>
         )}
       </div>
@@ -349,10 +368,22 @@ export default function FindUni() {
   const [doneInfo, setDoneInfo] = useState(null);
   const [courses, setCourses] = useState([]);
   const [scholarships, setScholarships] = useState([]);
+  const [locationFilter, setLocationFilter] = useState('');
   const [error, setError] = useState(null);
 
   const fileRef = useRef(null);
   const responseEndRef = useRef(null);
+
+  const filteredCourses = courses.filter(c => {
+    if (!locationFilter) return true;
+    const search = locationFilter.toLowerCase();
+    return (c.city?.toLowerCase() || '').includes(search) || 
+           (c.state?.toLowerCase() || '').includes(search);
+  });
+
+  const availableLocations = Array.from(new Set(
+    courses.map(c => c.state).filter(Boolean).concat(courses.map(c => c.city).filter(Boolean))
+  )).sort();
 
   const update = (k, v) => setProfile(p => ({ ...p, [k]: v }));
   const toggleCountry = (c) => {
@@ -718,14 +749,34 @@ export default function FindUni() {
 
             {/* ── DATA CARDS: Courses ── */}
             {courses.length > 0 && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <GraduationCap className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-lg font-serif font-medium text-gray-900">Matching Courses</h3>
-                  <span className="text-xs text-gray-400 ml-auto">from our database • sorted by relevance</span>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-10">
+                <div className="flex items-center justify-between flex-wrap gap-4 mb-5 pb-4 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5 text-blue-600" />
+                    <h3 className="text-lg font-serif font-medium text-gray-900">Matching Highly-Rated Courses</h3>
+                  </div>
+                  
+                  {/* Location Filter Filter */}
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-gray-400" />
+                    <select 
+                      className="text-xs bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-lg text-gray-600 focus:border-blue-300 outline-none appearance-none cursor-pointer"
+                      value={locationFilter}
+                      onChange={e => setLocationFilter(e.target.value)}
+                    >
+                      <option value="">All States & Cities</option>
+                      {availableLocations.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                    </select>
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {courses.map((c, i) => <CourseCard key={i} course={c} index={i} />)}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredCourses.map((c, i) => <CourseCard key={i} course={c} index={i} />)}
+                  {filteredCourses.length === 0 && (
+                    <div className="md:col-span-2 py-10 text-center bg-gray-50 rounded-2xl border border-gray-100 italic text-gray-400 text-sm">
+                      No courses match this specific location filter.
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -776,12 +827,49 @@ export default function FindUni() {
 
                 {/* Done stats */}
                 {doneInfo && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6 flex items-center gap-2 flex-wrap">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 border border-purple-100 text-purple-600 text-xs font-semibold"><Brain className="w-3 h-3" />{doneInfo.display_name}</span>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 border border-green-100 text-green-700 text-xs font-semibold"><DollarSign className="w-3 h-3" />${doneInfo.cost_usd?.toFixed(4)}</span>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-xs font-semibold"><Zap className="w-3 h-3" />{doneInfo.usage?.total_tokens?.toLocaleString()} tokens</span>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-gray-500 text-xs font-semibold"><Clock className="w-3 h-3" />{doneInfo.total_time_seconds}s</span>
-                  </motion.div>
+                  <div className="mt-8 space-y-6">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 border border-purple-100 text-purple-600 text-xs font-semibold"><Brain className="w-3 h-3" />{doneInfo.display_name} Analysis</span>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 border border-green-100 text-green-700 text-xs font-semibold"><Clock className="w-3 h-3" />{doneInfo.total_time_seconds}s Processing</span>
+                    </motion.div>
+
+                    {/* Elite Claude Button */}
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5 }}
+                      className="p-6 rounded-3xl bg-black text-white relative overflow-hidden group shadow-2xl"
+                    >
+                       <div className="absolute inset-0 opacity-10 bg-[url('/images/data_texture.png')] bg-cover"></div>
+                       <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-5">
+                          <div className="text-center md:text-left">
+                            <h4 className="text-lg font-serif font-medium mb-1">Need even deeper analysis?</h4>
+                            <p className="text-xs text-gray-400 max-w-sm">Connect Skolr directly to Claude for a high-fidelity counseling session with your full data profile.</p>
+                          </div>
+                          <a 
+                            href="https://claude.ai/settings/connectors" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="bg-white text-black px-6 py-3 rounded-full text-sm font-bold flex items-center gap-2 hover:bg-gray-100 transition-all hover:scale-105 active:scale-95"
+                          >
+                            <Zap className="w-4 h-4" /> Use Claude Connector
+                          </a>
+                       </div>
+                    </motion.div>
+
+                    {/* Legal Disclaimer Block */}
+                    <div className="p-8 rounded-[2rem] bg-gray-50 border border-gray-100 text-center">
+                       <ShieldCheck className="w-8 h-8 text-blue-600 mx-auto mb-4" />
+                       <h4 className="font-serif text-xl font-medium text-gray-900 mb-3 text-center">Our Commitment to Transparency</h4>
+                       <p className="text-sm text-gray-500 leading-relaxed max-w-2xl mx-auto mb-5 italic">
+                         "Skolr is an AI technology connection tool. We are not migration agents, registered legal advisors, or authorized educational consultants. We provide a bridge between you and official university/government data so you can make decisions without middlemen. This service is for informational purposes only—verify everything on our links."
+                       </p>
+                       <div className="flex items-center justify-center gap-4">
+                         <span className="px-3 py-1 rounded-full bg-white border border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Legal AI Proxy</span>
+                         <span className="px-3 py-1 rounded-full bg-white border border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-widest">100% Commissions-Free</span>
+                       </div>
+                    </div>
+                  </div>
                 )}
 
                 {/* Disclaimer */}

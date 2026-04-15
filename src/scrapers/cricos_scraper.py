@@ -63,6 +63,8 @@ class CricosScraper:
             if not name or name.lower() == 'nan':
                 continue
                 
+            provider_code_col = next((c for c in df.columns if 'provider code' in c), None)
+            
             uni_kwargs = {
                 "name": name,
                 "country": "Australia",
@@ -70,6 +72,8 @@ class CricosScraper:
                 "total_students": int(row[capacity_col]) if capacity_col and pd.notna(row[capacity_col]) else None,
                 "website": str(row[website_col]) if website_col and pd.notna(row[website_col]) else None,
                 "city": str(row[city_col]) if city_col and pd.notna(row[city_col]) else None,
+                "state": str(row[type_col]) if type_col and pd.notna(row[type_col]) else None, # Often type/state are nearby or same col in some reports
+                "provider_code": str(row[provider_code_col]) if provider_code_col and pd.notna(row[provider_code_col]) else None,
             }
             universities.append(University(**uni_kwargs))
             
@@ -117,6 +121,9 @@ class CricosScraper:
                 except ValueError:
                     pass
 
+            course_code_col = next((c for c in df.columns if 'course code' in c or 'cricos code' in c), None)
+            provider_code_col = next((c for c in df.columns if 'provider code' in c), None)
+
             course_kwargs = {
                 "name": course_name,
                 "university": uni_name,
@@ -124,7 +131,9 @@ class CricosScraper:
                 "level": str(row[level_col]) if level_col and pd.notna(row[level_col]) else None,
                 "duration_months": duration_months,
                 "tuition_fee": tuition_fee,
-                "currency": "AUD",  # CRICOS deals strictly in AUD
+                "currency": "AUD",
+                "cricos_code": str(row[course_code_col]) if course_code_col and pd.notna(row[course_code_col]) else None,
+                "provider_code": str(row[provider_code_col]) if provider_code_col and pd.notna(row[provider_code_col]) else None,
             }
             courses.append(Course(**course_kwargs))
             

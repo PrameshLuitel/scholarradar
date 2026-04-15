@@ -48,8 +48,10 @@ class Course(BaseDBModel):
     gpa_requirement: Optional[str] = None
     entry_qualification: Optional[str] = None
     start_dates: Optional[List[str]] = Field(default_factory=list)
-    apply_url: Optional[str] = None
-    source_url: Optional[str] = None
+    idp_required: Optional[bool] = None
+    cricos_code: Optional[str] = None
+    provider_code: Optional[str] = None
+    state: Optional[str] = None
     is_active: bool = True
     last_verified: Optional[datetime] = None
 
@@ -72,6 +74,8 @@ class University(BaseDBModel):
     accommodation_cost_max: Optional[float] = None
     website: Optional[str] = None
     idp_profile_url: Optional[str] = None
+    provider_code: Optional[str] = None
+    state: Optional[str] = None
 
 class VisaRequirement(BaseModel):
     id: Optional[UUID] = None

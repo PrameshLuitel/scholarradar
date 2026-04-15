@@ -131,12 +131,23 @@ def _query_matching_courses(
             fee = c.get("tuition_fee") or 0
             currency = c.get("currency", "AUD")
             source = (c.get("source") or "").upper()
+            
+            # Basic match reasoning
+            match_reasons = []
+            if rel >= 0.8: match_reasons.append("Perfect subject match")
+            elif rel >= 0.5: match_reasons.append("Strong subject alignment")
+            
+            if ielts_met: match_reasons.append("Meets English requirements")
+            
+            # If university is high-ranked (world_ranking is in universities table, but we don't have it here yet,
+            # we can add a generic high-quality tag if relevance is high and fee is standard)
 
             all_courses.append({
                 "name": c.get("name"),
                 "university": c.get("university"),
                 "country": c.get("country"),
                 "city": c.get("city"),
+                "state": c.get("state"),
                 "level": c.get("level"),
                 "tuition_fee": fee,
                 "tuition_display": f"{currency} {fee:,.0f}/yr" if fee else "Contact university",
@@ -147,8 +158,11 @@ def _query_matching_courses(
                 "entry_qualification": c.get("entry_qualification"),
                 "apply_url": c.get("apply_url"),
                 "source_url": c.get("source_url"),
+                "cricos_code": c.get("cricos_code"),
+                "provider_code": c.get("provider_code"),
                 "source": source,
                 "relevance": round(float(rel), 3),
+                "match_reason": " • ".join(match_reasons) if match_reasons else "Relevance match",
             })
 
     # Sort logic: 
