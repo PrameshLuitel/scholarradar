@@ -227,50 +227,43 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="safety" className="py-16 md:py-32 px-5 bg-blue-50/50 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-12">
-          <div className="flex-1">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold uppercase tracking-widest mb-6">
-              <ShieldCheck className="w-4 h-4"/> Legal & Data Integrity
-            </div>
-            <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-medium text-gray-900 mb-6 font-serif">
-              Built for accuracy, <br/><span className="italic text-gray-500">grounded in transparency.</span>
-            </h2>
-            <div className="space-y-6">
-              <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm shrink-0">
-                  <AlertCircle className="w-5 h-5 text-blue-600"/>
-                </div>
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-1">Not a Migration Agent</h4>
-                  <p className="text-gray-500 text-sm font-light leading-relaxed">Skolr is an AI data proxy. We are not migration agents, lawyers, or authorized counsellors. We do not provide professional advice.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm shrink-0">
-                  <Zap className="w-5 h-5 text-blue-600"/>
-                </div>
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-1">Real-time Verified Data</h4>
-                  <p className="text-gray-500 text-sm font-light leading-relaxed">Our data is scraped directly from university and government primary sources every 24 hours. No manual data entry errors.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm shrink-0">
-                  <Info className="w-5 h-5 text-blue-600"/>
-                </div>
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-1">Verify Source Links</h4>
-                  <p className="text-gray-500 text-sm font-light leading-relaxed">Every result comes with a direct link to the official page. Students must verify critical info on those sources before acting.</p>
-                </div>
-              </div>
-            </div>
+      <section id="safety" className="py-16 md:py-32 px-5 bg-white border-t border-gray-100">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12 md:mb-20">
+            <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-medium mb-3 md:mb-4 text-gray-900">Radical transparency.</h2>
+            <p className="text-gray-500 text-lg md:text-xl font-light max-w-2xl mx-auto">Skolr is an AI data proxy, not a migration agency. We aggregate the world's education data so you don't have to rely on middlemen.</p>
           </div>
-          <div className="flex-1 bg-white p-8 md:p-12 rounded-[2.5rem] shadow-xl border border-blue-100 flex flex-col justify-center border-t-8 border-t-blue-600">
-             <blockquote className="text-xl md:text-2xl font-serif italic text-gray-800 leading-relaxed mb-6">
-               "Students deserve data without the agency gatekeeping. We don't hide the truth or take commissions. We just serve the data."
-             </blockquote>
-             <p className="text-gray-400 font-medium">— The Skolr Open Mission</p>
+
+          <div className="grid md:grid-cols-3 gap-5 md:gap-8">
+            <div className="bg-gray-50 p-8 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-gray-100">
+              <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-sm mb-6">
+                <Network className="w-6 h-6 text-blue-600"/>
+              </div>
+              <h3 className="text-xl md:text-2xl font-serif font-medium mb-3">Primary Source Data</h3>
+              <p className="text-gray-500 font-light leading-relaxed mb-6">Our daily scrapers pull directly from the most authoritative databases in global education.</p>
+              <div className="flex flex-wrap gap-2">
+                <span className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-600">IDP Connect</span>
+                <span className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-600">CRICOS (AU)</span>
+                <span className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-600">Gov.UK</span>
+                <span className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-600">Official Uni Pages</span>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-8 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-gray-100">
+              <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-sm mb-6">
+                <ShieldCheck className="w-6 h-6 text-blue-600"/>
+              </div>
+              <h3 className="text-xl md:text-2xl font-serif font-medium mb-3">Independent Proxy</h3>
+              <p className="text-gray-500 font-light leading-relaxed">We are not authorized educational counsellors or lawyers. We don't take commissions, and we do not provide professional advice. We strictly provide programmatic access to public data.</p>
+            </div>
+
+            <div className="bg-gray-50 p-8 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-gray-100">
+              <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-sm mb-6">
+                <Search className="w-6 h-6 text-blue-600"/>
+              </div>
+              <h3 className="text-xl md:text-2xl font-serif font-medium mb-3">Mandatory Verification</h3>
+              <p className="text-gray-500 font-light leading-relaxed">Tuition fees and visa rules change completely without notice. Every Skolr result returns a source link. You must verify all critical information on the official primary source before acting.</p>
+            </div>
           </div>
         </div>
       </section>
