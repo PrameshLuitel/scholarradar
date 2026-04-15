@@ -35,6 +35,19 @@ export default function Footer() {
             <Link to="/ip-infringement" className="text-gray-500 hover:text-black font-light transition-colors text-sm">IP Infringement</Link>
           </div>
         </div>
+      <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-gray-50 flex flex-col items-center">
+        <div className="max-w-3xl text-center">
+          <p className="text-[10px] md:text-xs text-gray-400 font-light leading-relaxed">
+            <span className="font-semibold text-gray-500 uppercase tracking-widest mr-2">Disclaimer:</span>
+            Skolr is an AI-powered data aggregator and is NOT a registered migration agent, legal advisor, or authorized educational consultant. 
+            All information provided is for informational purposes only. Data is scraped from public sources and may contain errors. 
+            Official university requirements, tuition fees, and government visa regulations change frequently; always verify information on official websites before making financial or legal commitments. 
+            Use of this service constitutes acceptance of our <Link to="/terms" className="underline hover:text-blue-600 transition-colors">Terms of Use</Link>.
+          </p>
+        </div>
+        <p className="mt-8 text-[11px] text-gray-300 font-light">
+          &copy; {new Date().getFullYear()} Skolr. All rights reserved.
+        </p>
       </div>
     </footer>
   );

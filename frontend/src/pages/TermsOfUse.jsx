@@ -13,9 +13,13 @@ export default function TermsOfUse() {
         </div>
 
         <div>
-          <h2 className="text-gray-900 font-medium text-2xl mb-4 font-serif">2. Disclaimer of Warranties ("As-Is")</h2>
-          <p>The data provided through Skolr is live-scraped from public universities, government endpoints, and third-party databases. While we refresh this data aggressively (every 24 hours), we make <strong>no warranties, expressed or implied</strong>, about the accuracy, reliability, or availability of the information.</p>
-          <p className="mt-4">Skolr is a routing layer, not a registered educational agency or legal immigration advisor. Users and their respective AI agents are solely responsible for independently verifying all visas, deadlines, and tuition costs presented by the tool.</p>
+          <h2 className="text-gray-900 font-medium text-2xl mb-4 font-serif">2. No Professional Advice & Disclaimer of Warranties</h2>
+          <p>Skolr is a data aggregation tool powered by Artificial Intelligence. <strong>We are NOT registered migration agents, legal advisors, certified financial planners, or authorized educational consultants.</strong></p>
+          <ul className="list-disc pl-6 space-y-2 mt-4">
+            <li><strong>AI-Generated Content:</strong> Information is served by AI models which may occasionally hallucinate or provide outdated data.</li>
+            <li><strong>"As-Is" Basis:</strong> We provide data exactly as found on public sources, with no warranty of accuracy, completeness, or timeliness.</li>
+            <li><strong>Mandatory Verification:</strong> You must independently verify all admissions requirements, tuition fees, and visa regulations on official university or government portals.</li>
+          </ul>
         </div>
 
         <div>
@@ -31,7 +35,7 @@ export default function TermsOfUse() {
 
         <div>
           <h2 className="text-gray-900 font-medium text-2xl mb-4 font-serif">4. Limitation of Liability</h2>
-          <p>In no event shall Skolr or its developers be liable for any direct, indirect, incidental, consequential, or punitive damages arising out of your access to or use of the Service, including but not limited to missed application deadlines, rejected visas, or inaccurate financial estimates.</p>
+          <p><strong>To the maximum extent permitted by law, Skolr and its developers shall NOT be held liable</strong> for any direct, indirect, incidental, or consequential damages resulting from your use of this tool. This includes, but is not limited to: missed application deadlines, rejected visa applications, incorrect financial planning based on our estimates, or any other academic or legal setbacks.</p>
         </div>
 
         <div>

@@ -30,6 +30,10 @@ export default function Home() {
                 See what it can do
               </a>
             </div>
+            
+            <p className="mt-6 text-[10px] text-gray-400 font-light max-w-md mx-auto lg:mx-0">
+              *Skolr is an AI data proxy. Not professional advice. Verify all data on official university or government sites.
+            </p>
           </div>
           
           <div className="flex-1 relative w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-none mt-4 lg:mt-0">
