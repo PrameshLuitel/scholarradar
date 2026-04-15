@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Home from './pages/Home';
+import FindUni from './pages/FindUni';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfUse from './pages/TermsOfUse';
 import Compliance from './pages/Compliance';
@@ -26,6 +27,7 @@ export default function App() {
         
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/finduni" element={<FindUni />} />
           <Route path="/privacypolicy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfUse />} />
           <Route path="/compliance" element={<Compliance />} />

@@ -1,0 +1,639 @@
+"""
+FindUni AI Advisor API — The core endpoint that powers skolr.xyz/finduni.
+
+Accepts a student's CV (optional PDF) + profile data, queries the entire
+ScholarRadar database for matching opportunities, and streams a deeply
+personalized study abroad plan through Groq LLMs.
+
+Architecture:
+  1. Parse CV PDF → extract text
+  2. Query Supabase for matching courses, scholarships, universities, visa, costs
+  3. Build a mega-prompt with all real data
+  4. Stream response via Groq cascade (5 models, guaranteed response)
+  5. Return SSE stream to frontend
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import time
+from collections import defaultdict
+from datetime import date, datetime, timedelta
+from difflib import SequenceMatcher
+from typing import Any, Optional
+
+import structlog
+from fastapi import FastAPI, File, Form, UploadFile
+from fastapi.responses import StreamingResponse, JSONResponse
+
+log = structlog.get_logger("api.advisor")
+
+app = FastAPI(title="FindUni AI Advisor")
+
+# Max CV file size: 5MB
+MAX_CV_SIZE = 5 * 1024 * 1024
+
+
+# ── Helpers ─────────────────────────────────────────────────────────────────
+
+def _get_db():
+    from src.database.client import get_db
+    return get_db()
+
+
+def _fuzzy(query: Optional[str], text: Optional[str]) -> float:
+    if not query or not text:
+        return 0.0
+    q, t = query.lower(), text.lower()
+    if q in t:
+        return 0.95
+    tq = set(re.split(r"\W+", q))
+    tt = set(re.split(r"\W+", t))
+    if tq and tt:
+        overlap = len(tq & tt) / len(tq)
+        if overlap > 0:
+            return 0.5 + overlap * 0.4
+    return SequenceMatcher(None, q, t).ratio()
+
+
+def _infer_level(qualification: str) -> Optional[str]:
+    q = qualification.lower()
+    if any(k in q for k in ("high school", "secondary", "+2", "12th", "a-level", "slc", "ssc", "hsc")):
+        return "undergraduate"
+    if any(k in q for k in ("bachelor", "bsc", "ba ", "beng", "be ", "btech", "undergraduate", "btec")):
+        return "postgraduate"
+    if any(k in q for k in ("master", "msc", "ma ", "mba", "meng", "ms ")):
+        return "doctorate"
+    return None
+
+
+# ── Database Queries ────────────────────────────────────────────────────────
+
+def _query_matching_courses(
+    target_subject: str,
+    countries: list[str],
+    inferred_level: Optional[str],
+    ielts_score: Optional[float] = None,
+    limit: int = 15,
+) -> list[dict]:
+    """Query courses matching the student's profile."""
+    db = _get_db()
+    all_courses = []
+
+    for country in countries:
+        query = db.table("courses").select("*").eq("is_active", True).ilike("country", country.strip())
+        if inferred_level:
+            query = query.ilike("level", inferred_level)
+        rows = (query.execute()).data or []
+
+        for c in rows:
+            rel = max(
+                _fuzzy(target_subject, c.get("name") or ""),
+                _fuzzy(target_subject, c.get("subject") or ""),
+                _fuzzy(target_subject, c.get("subject_category") or ""),
+            )
+            if rel < 0.25:
+                continue
+
+            ielts_met = True
+            if ielts_score and c.get("ielts_overall"):
+                ielts_met = c["ielts_overall"] <= ielts_score
+
+            fee = c.get("tuition_fee") or 0
+            currency = c.get("currency", "AUD")
+
+            all_courses.append({
+                "name": c.get("name"),
+                "university": c.get("university"),
+                "country": c.get("country"),
+                "city": c.get("city"),
+                "level": c.get("level"),
+                "tuition_fee": fee,
+                "tuition_display": f"{currency} {fee:,.0f}/yr" if fee else "Contact university",
+                "duration_months": c.get("duration_months"),
+                "ielts_required": c.get("ielts_overall"),
+                "ielts_met": ielts_met,
+                "gpa_requirement": c.get("gpa_requirement"),
+                "entry_qualification": c.get("entry_qualification"),
+                "apply_url": c.get("apply_url"),
+                "source_url": c.get("source_url"),
+                "relevance": round(float(rel), 3),
+            })
+
+    all_courses.sort(key=lambda x: (-float(x["relevance"]), x.get("tuition_fee") or 0))
+    return all_courses[:limit]
+
+
+def _query_matching_scholarships(
+    target_subject: str,
+    countries: list[str],
+    inferred_level: Optional[str],
+    nationality: str,
+    limit: int = 15,
+) -> list[dict]:
+    """Query scholarships matching the student's profile."""
+    db = _get_db()
+    all_scholarships = []
+    today = date.today()
+
+    for country in countries:
+        query = db.table("scholarships").select("*").eq("is_active", True).ilike("country", country.strip())
+        if inferred_level:
+            query = query.ilike("study_level", inferred_level)
+        rows = (query.execute()).data or []
+
+        for s in rows:
+            match_score = 0.0
+            reasons = []
+
+            subj_rel = max(
+                _fuzzy(target_subject, s.get("subject") or ""),
+                _fuzzy(target_subject, s.get("subject_category") or ""),
+                _fuzzy(target_subject, s.get("description") or ""),
+            )
+            if subj_rel > 0.3:
+                match_score += subj_rel * 0.3
+                reasons.append(f"Subject match: {subj_rel:.0%}")
+
+            elig = (s.get("eligibility") or "").lower()
+            if nationality.lower() in elig:
+                match_score += 0.25
+                reasons.append(f"Open to {nationality} students")
+            elif "all international" in elig or not elig:
+                match_score += 0.1
+                reasons.append("Open to all international students")
+
+            if s.get("funding_type") == "full":
+                match_score += 0.15
+                reasons.append("Fully funded")
+
+            if s.get("deadline"):
+                try:
+                    dl = datetime.fromisoformat(str(s["deadline"])).date()
+                    if dl < today:
+                        continue
+                    days_left = (dl - today).days
+                    if days_left < 30:
+                        reasons.append(f"Deadline in {days_left} days!")
+                except (ValueError, TypeError):
+                    pass
+
+            if match_score <= 0.05:
+                continue
+
+            val = s.get("award_value_max") or s.get("award_value_min") or 0
+            curr = s.get("award_currency", "AUD")
+
+            all_scholarships.append({
+                "title": s.get("title"),
+                "university": s.get("university"),
+                "country": s.get("country"),
+                "funding_type": s.get("funding_type"),
+                "value": f"{curr} {val:,.0f}" if val else "Contact provider",
+                "value_numeric": val,
+                "deadline": str(s["deadline"]) if s.get("deadline") else None,
+                "eligibility": s.get("eligibility"),
+                "match_score": round(float(match_score), 3),
+                "why_matched": reasons,
+                "apply_url": s.get("apply_url"),
+                "source_url": s.get("source_url"),
+            })
+
+    all_scholarships.sort(key=lambda x: float(x["match_score"]), reverse=True)
+    return all_scholarships[:limit]
+
+
+def _query_universities(countries: list[str], limit: int = 10) -> list[dict]:
+    """Get top universities in preferred countries."""
+    db = _get_db()
+    all_unis = []
+    for country in countries:
+        rows = (db.table("universities").select("*")
+                .ilike("country", country.strip())
+                .order("world_ranking", nullsfirst=False)
+                .limit(20).execute()).data or []
+        for u in rows:
+            all_unis.append({
+                "name": u.get("name"),
+                "country": u.get("country"),
+                "city": u.get("city"),
+                "world_ranking": u.get("world_ranking"),
+                "acceptance_rate": u.get("acceptance_rate"),
+                "ielts_minimum": u.get("ielts_minimum"),
+                "tuition_min": u.get("tuition_min"),
+                "tuition_max": u.get("tuition_max"),
+                "website": u.get("website"),
+            })
+    all_unis.sort(key=lambda x: x.get("world_ranking") or 9999)
+    return all_unis[:limit]
+
+
+def _query_visa_data(nationality: str, countries: list[str]) -> list[dict]:
+    """Get visa requirements for student's nationality → each country."""
+    db = _get_db()
+    results = []
+    for country in countries:
+        rows = (db.table("visa_requirements").select("*")
+                .ilike("nationality", nationality.strip())
+                .ilike("destination_country", country.strip())
+                .execute()).data or []
+        if rows:
+            v = rows[0]
+            results.append({
+                "country": country,
+                "visa_type": v.get("visa_type"),
+                "financial_requirement_aud": v.get("financial_requirement_aud"),
+                "processing_weeks": f"{v.get('processing_weeks_min', '?')}–{v.get('processing_weeks_max', '?')}",
+                "work_rights_hours": v.get("work_rights_hours_per_week"),
+                "health_requirements": v.get("health_requirements"),
+            })
+        else:
+            results.append({
+                "country": country,
+                "message": f"No visa data found for {nationality} → {country}",
+            })
+    return results
+
+
+def _query_cost_of_living(countries: list[str]) -> list[dict]:
+    """Get cost of living data for top cities in each country."""
+    db = _get_db()
+    results = []
+    for country in countries:
+        rows = (db.table("cost_of_living").select("*")
+                .ilike("country", country.strip())
+                .limit(3).execute()).data or []
+        for c in rows:
+            results.append({
+                "city": c.get("city"),
+                "country": c.get("country"),
+                "rent_shared_range": f"{c.get('rent_shared_min', '?')}–{c.get('rent_shared_max', '?')}",
+                "food_monthly": c.get("food_monthly"),
+                "transport_monthly": c.get("transport_monthly"),
+                "total_monthly_min": c.get("total_monthly_min"),
+                "total_monthly_max": c.get("total_monthly_max"),
+                "part_time_wage_hourly": c.get("part_time_wage_hourly"),
+                "currency": c.get("currency", "AUD"),
+            })
+    return results
+
+
+# ── System Prompt ───────────────────────────────────────────────────────────
+
+SYSTEM_PROMPT = """You are **Skolr AI Advisor** — the most helpful, honest, and deeply knowledgeable study abroad counselor in the world. You exist to help students from developing countries build a real future through international education.
+
+## YOUR MISSION
+Provide the most comprehensive, actionable, and genuinely useful study abroad guidance possible. This student is trusting you with one of the biggest decisions of their life. Be worthy of that trust.
+
+## CORE PRINCIPLES
+1. **UNBIASED**: Never favor any country, university, or pathway. Present honest pros AND cons.
+2. **ACTIONABLE**: Every recommendation must have specific next steps — not vague "consider exploring" language.
+3. **DATA-DRIVEN**: Base recommendations on the REAL database results provided below. Reference actual course names, actual scholarship amounts, actual deadlines.
+4. **HONEST**: If the student's profile has weaknesses, say so kindly but clearly. Tell them exactly how to fix it.
+5. **COMPLETE**: Cover everything — academics, finances, visa, career, timeline, backup plans.
+6. **EMPATHETIC**: You understand the financial pressure, family expectations, and visa anxiety. Address these emotional realities.
+
+## RESPONSE FORMAT
+Structure your response using these exact sections with markdown headers. Be thorough in each section — this is the student's primary guidance document:
+
+### 🎯 Profile Analysis
+Summarize what you understand about the student from their CV and profile. Highlight strengths, note gaps, suggest improvements. Be specific.
+
+### 🎓 Recommended Universities & Courses
+From the database results, recommend the TOP 3-5 best-fit courses. For EACH one explain:
+- Why this course specifically fits their background
+- Tuition fees and total cost estimate
+- Entry requirements vs their qualifications
+- Direct application link
+- Your honest assessment of admission probability (High/Medium/Low)
+
+### 💰 Scholarship Opportunities
+From the database results, highlight the TOP 3-5 scholarships they should apply to. For EACH one:
+- Award value and what it covers
+- Why they're a good match (based on their profile)
+- Application deadline (URGENT if soon)
+- Direct application link
+- Specific tips to strengthen their application
+
+### 💵 Financial Reality Check
+Give an honest breakdown:
+- Total cost estimate for their top university choices
+- How much they'd need upfront vs. over time
+- Scholarships that could offset costs
+- Part-time work potential and realistic earnings
+- Whether their stated budget is realistic (if not, say so honestly)
+- Alternative cheaper options if budget is tight
+
+### 🛂 Visa Pathway
+Based on their nationality and destination countries:
+- Specific visa type they need
+- Financial proof requirements
+- Processing timeline
+- Key risks for their nationality (be honest about scrutiny levels)
+- How to strengthen their application
+- Post-study work rights
+
+### 📝 Test Score Strategy
+If they have IELTS/test scores:
+- Which universities their score qualifies them for
+- How many more options a 0.5 or 1.0 improvement would unlock
+- Whether retaking is worth their time
+If they haven't taken tests yet:
+- Target scores for their university choices
+- Preparation timeline
+- Test booking advice
+
+### 📅 Month-by-Month Action Plan
+Create a specific timeline from NOW to their target start date. Each month should have:
+- Primary task
+- Specific action items
+- Deadlines to hit
+
+### 🚀 Career Pathway
+Connect their study choice to career outcomes:
+- What careers this qualification opens
+- Job market demand in their destination country
+- Post-study work visa duration
+- Salary expectations for graduates
+- How this aligns with their stated career goals
+
+### ⚡ Top 5 Immediate Actions
+Number them 1-5, most urgent first. These are the things they should literally do TODAY or THIS WEEK.
+
+### ⚠️ Important Disclaimers
+- Always remind that you are an AI data aggregator, NOT a migration agent
+- All data should be verified on official university/government websites
+- Tuition fees and visa rules change frequently
+- Include source: FindUni.online / Skolr.xyz
+
+## RULES
+- Use the ACTUAL data provided in the database results. Do not make up universities, scholarships, or numbers.
+- If the database results are empty for a category, say so honestly and suggest broader searches.
+- Include direct URLs from the database results when available.
+- Format currency amounts clearly with proper symbols.
+- Use emoji headers as shown above for visual structure.
+- Be warm but professional. Avoid corporate jargon.
+- Write for a student who may not have perfect English — use clear, simple language.
+- NEVER recommend paying an agent or consultancy. The student can do this themselves with your guidance.
+"""
+
+
+def _build_user_prompt(
+    profile: dict,
+    cv_text: str,
+    courses: list[dict],
+    scholarships: list[dict],
+    universities: list[dict],
+    visa_data: list[dict],
+    cost_data: list[dict],
+) -> str:
+    """Build the comprehensive user prompt with all data."""
+
+    sections = []
+
+    # CV section
+    if cv_text:
+        sections.append(f"""## Student's CV/Resume
+<cv>
+{cv_text}
+</cv>""")
+
+    # Profile section
+    profile_lines = []
+    field_map = {
+        "nationality": "Nationality",
+        "current_qualification": "Current Qualification",
+        "gpa": "GPA (out of 4.0)",
+        "ielts_overall": "IELTS Overall",
+        "ielts_reading": "IELTS Reading",
+        "ielts_writing": "IELTS Writing",
+        "ielts_speaking": "IELTS Speaking",
+        "ielts_listening": "IELTS Listening",
+        "target_subject": "Target Subject/Field",
+        "preferred_countries": "Preferred Countries",
+        "budget_usd": "Total Budget (USD)",
+        "timeline_months": "Timeline (months until start)",
+        "career_goal": "Career Goal",
+        "work_experience_years": "Work Experience (years)",
+        "extra_info": "Additional Information",
+    }
+    for key, label in field_map.items():
+        val = profile.get(key)
+        if val is not None and val != "" and val != []:
+            if isinstance(val, list):
+                val = ", ".join(val)
+            profile_lines.append(f"- **{label}**: {val}")
+
+    sections.append("## Student Profile\n" + "\n".join(profile_lines))
+
+    # Database results
+    if courses:
+        course_text = json.dumps(courses, indent=2, default=str)
+        sections.append(f"""## Matching Courses from Database ({len(courses)} results)
+```json
+{course_text}
+```""")
+    else:
+        sections.append("## Matching Courses from Database\nNo matching courses found in our database for this profile. Please suggest the student search more broadly or check official university websites directly.")
+
+    if scholarships:
+        schol_text = json.dumps(scholarships, indent=2, default=str)
+        sections.append(f"""## Matching Scholarships from Database ({len(scholarships)} results)
+```json
+{schol_text}
+```""")
+    else:
+        sections.append("## Matching Scholarships from Database\nNo matching scholarships found. Suggest checking university-specific funding pages and government scholarship portals directly.")
+
+    if universities:
+        uni_text = json.dumps(universities, indent=2, default=str)
+        sections.append(f"""## University Data
+```json
+{uni_text}
+```""")
+
+    if visa_data:
+        visa_text = json.dumps(visa_data, indent=2, default=str)
+        sections.append(f"""## Visa Requirements Data
+```json
+{visa_text}
+```""")
+
+    if cost_data:
+        cost_text = json.dumps(cost_data, indent=2, default=str)
+        sections.append(f"""## Cost of Living Data
+```json
+{cost_text}
+```""")
+
+    sections.append("""## Your Task
+Based on ALL the data above — the student's CV, their profile, and the real database results — provide the most comprehensive, actionable, and genuinely helpful study abroad guidance possible. Follow the response format specified in your instructions. Make this genuinely life-changing advice.""")
+
+    return "\n\n".join(sections)
+
+
+# ── Main Endpoint ───────────────────────────────────────────────────────────
+
+@app.post("/analyze")
+async def analyze_profile(
+    profile: str = Form(...),
+    cv_file: Optional[UploadFile] = File(None),
+):
+    """
+    Analyze a student's profile and CV, then stream personalized guidance.
+
+    - `profile`: JSON string with student profile fields
+    - `cv_file`: Optional PDF file (max 5MB)
+
+    Returns a text/event-stream (SSE) with the AI response.
+    """
+    started = time.time()
+
+    try:
+        # Parse profile JSON
+        try:
+            profile_data = json.loads(profile)
+        except json.JSONDecodeError:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Invalid profile JSON"},
+            )
+
+        # Validate required fields
+        nationality = profile_data.get("nationality", "").strip()
+        target_subject = profile_data.get("target_subject", "").strip()
+        preferred_countries = profile_data.get("preferred_countries", [])
+
+        if not nationality:
+            return JSONResponse(status_code=400, content={"error": "Nationality is required"})
+        if not target_subject:
+            return JSONResponse(status_code=400, content={"error": "Target subject is required"})
+        if not preferred_countries:
+            return JSONResponse(status_code=400, content={"error": "At least one preferred country is required"})
+
+        if isinstance(preferred_countries, str):
+            preferred_countries = [c.strip() for c in preferred_countries.split(",")]
+
+        # Parse CV if provided
+        cv_text = ""
+        if cv_file:
+            if cv_file.size and cv_file.size > MAX_CV_SIZE:
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "CV file too large. Maximum size is 5MB."},
+                )
+
+            content_type = cv_file.content_type or ""
+            if "pdf" not in content_type.lower() and not cv_file.filename.lower().endswith(".pdf"):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "Only PDF files are accepted. Please upload your CV as a PDF."},
+                )
+
+            try:
+                from src.utils.cv_parser import extract_text_from_pdf
+                pdf_bytes = await cv_file.read()
+                cv_text = extract_text_from_pdf(pdf_bytes)
+            except ValueError as e:
+                return JSONResponse(status_code=400, content={"error": str(e)})
+            except Exception as e:
+                log.error("cv_parse_error", error=str(e))
+                cv_text = ""  # Continue without CV
+
+        # Extract profile fields
+        current_qualification = profile_data.get("current_qualification", "")
+        ielts_score = profile_data.get("ielts_overall")
+        if ielts_score:
+            try:
+                ielts_score = float(ielts_score)
+            except (ValueError, TypeError):
+                ielts_score = None
+
+        inferred_level = _infer_level(current_qualification) if current_qualification else None
+
+        log.info(
+            "advisor_analyze",
+            nationality=nationality,
+            subject=target_subject,
+            countries=preferred_countries,
+            has_cv=bool(cv_text),
+            inferred_level=inferred_level,
+        )
+
+        # Query database
+        courses = _query_matching_courses(
+            target_subject, preferred_countries, inferred_level, ielts_score
+        )
+        scholarships = _query_matching_scholarships(
+            target_subject, preferred_countries, inferred_level, nationality
+        )
+        universities = _query_universities(preferred_countries)
+        visa_data = _query_visa_data(nationality, preferred_countries)
+        cost_data = _query_cost_of_living(preferred_countries)
+
+        db_time = round(time.time() - started, 2)
+        log.info(
+            "advisor_db_complete",
+            courses=len(courses),
+            scholarships=len(scholarships),
+            universities=len(universities),
+            visa=len(visa_data),
+            costs=len(cost_data),
+            db_time_seconds=db_time,
+        )
+
+        # Build prompt
+        user_prompt = _build_user_prompt(
+            profile_data, cv_text, courses, scholarships,
+            universities, visa_data, cost_data,
+        )
+
+        # Stream response
+        async def event_stream():
+            from src.utils.groq_cascade import stream_groq_response, get_model_display_name
+
+            # Send metadata first
+            yield f"data: {json.dumps({'type': 'metadata', 'courses_found': len(courses), 'scholarships_found': len(scholarships), 'universities_found': len(universities), 'db_time_seconds': db_time})}\n\n"
+
+            # Send the actual database results as structured data for rich card rendering
+            if courses:
+                yield f"data: {json.dumps({'type': 'courses', 'data': courses[:10]})}\n\n"
+            if scholarships:
+                yield f"data: {json.dumps({'type': 'scholarships', 'data': scholarships[:10]})}\n\n"
+
+            async for event in stream_groq_response(
+                SYSTEM_PROMPT, user_prompt, max_tokens=4096, temperature=0.7
+            ):
+                if event["type"] == "model":
+                    display_name = get_model_display_name(event["model"])
+                    yield f"data: {json.dumps({'type': 'model', 'model': event['model'], 'display_name': display_name})}\n\n"
+
+                elif event["type"] == "chunk":
+                    yield f"data: {json.dumps({'type': 'chunk', 'content': event['content']})}\n\n"
+
+                elif event["type"] == "done":
+                    total_time = round(time.time() - started, 2)
+                    yield f"data: {json.dumps({'type': 'done', 'model': event['model'], 'display_name': get_model_display_name(event['model']), 'usage': event.get('usage', {}), 'cost_usd': event.get('cost_usd', 0), 'total_time_seconds': total_time})}\n\n"
+
+                elif event["type"] == "error":
+                    yield f"data: {json.dumps({'type': 'error', 'message': event['message']})}\n\n"
+
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    except Exception as e:
+        log.error("advisor_analyze_error", error=str(e))
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Analysis failed: {str(e)}"},
+        )

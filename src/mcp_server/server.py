@@ -95,12 +95,14 @@ app = FastAPI(
     lifespan=combined_lifespan
 )
 
-# 4.5 Include Analytics and Dashboard Endpoints
+# 4.5 Include Analytics, Dashboard, and Advisor Endpoints
 from src.api.analytics import app as analytics_app
 from src.api.dashboard import app as dashboard_app
+from src.api.advisor import app as advisor_app
 
 app.mount("/analytics", analytics_app)
 app.mount("/dashboard", dashboard_app)
+app.mount("/api/advisor", advisor_app)
 
 # 5. CORS Middleware
 app.add_middleware(
