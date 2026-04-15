@@ -857,16 +857,16 @@ export default function FindUni() {
                        </div>
                     </motion.div>
 
-                    {/* Legal Disclaimer Block */}
+                    {/* Legal Disclaimer & Disclosure */}
                     <div className="p-8 rounded-[2rem] bg-gray-50 border border-gray-100 text-center">
                        <ShieldCheck className="w-8 h-8 text-gray-400 mx-auto mb-4" />
-                       <h4 className="font-serif text-xl font-medium text-gray-900 mb-3 text-center">Estimate-Only Tool</h4>
+                       <h4 className="font-serif text-xl font-medium text-gray-900 mb-3 text-center">Data Disclosure & Disclaimer</h4>
                        <p className="text-sm text-gray-500 leading-relaxed max-w-2xl mx-auto mb-5 italic">
-                         "Skolr is just a data aggregator. We are nothing—no agents, no migration advisors, and no legal counsellors. We provide no professional advice. This tool is strictly for estimates and informational exploration. Always verify critical data on official university or government websites."
+                         "Skolr serves strictly as an independent data aggregation platform. We are not migration agents, legal advisors, or authorized educational consultants. The information presented is for informational and estimation purposes only and does not constitute professional advice. It is the user's responsibility to verify all critical data on official university or government sources."
                        </p>
                        <div className="flex items-center justify-center gap-4">
-                         <span className="px-3 py-1 rounded-full bg-white border border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pure Data Proxy</span>
-                         <span className="px-3 py-1 rounded-full bg-white border border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Informational Estimates Only</span>
+                         <span className="px-3 py-1 rounded-full bg-white border border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Independent Data Proxy</span>
+                         <span className="px-3 py-1 rounded-full bg-white border border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Informational Use Only</span>
                        </div>
                     </div>
                   </div>
