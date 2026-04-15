@@ -108,13 +108,19 @@ def _query_matching_courses(
         rows = (query.execute()).data or []
 
         for c in rows:
+            course_name = (c.get("name") or "").lower()
+            # Filter out junk 6-month study abroad / non-degree programs unless specifically relevant
+            junk_keywords = ["study abroad", "exchange", "exchange program", "non-award"]
+            if any(k in course_name for k in junk_keywords) and not any(k in target_subject.lower() for k in junk_keywords):
+                continue
+
             rel = max(
                 _fuzzy(target_subject, c.get("name") or ""),
                 _fuzzy(target_subject, c.get("subject") or ""),
                 _fuzzy(target_subject, c.get("subject_category") or ""),
             )
             # If subject is provided, be strict. If not, we provide more top courses for AI to filter via CV.
-            threshold = 0.35 if target_subject else 0.0
+            threshold = 0.35 if target_subject else 0.2
             if rel < threshold:
                 continue
 
@@ -124,6 +130,7 @@ def _query_matching_courses(
 
             fee = c.get("tuition_fee") or 0
             currency = c.get("currency", "AUD")
+            source = (c.get("source") or "").upper()
 
             all_courses.append({
                 "name": c.get("name"),
@@ -140,10 +147,22 @@ def _query_matching_courses(
                 "entry_qualification": c.get("entry_qualification"),
                 "apply_url": c.get("apply_url"),
                 "source_url": c.get("source_url"),
+                "source": source,
                 "relevance": round(float(rel), 3),
             })
 
-    all_courses.sort(key=lambda x: (-float(x["relevance"]), x.get("tuition_fee") or 0))
+    # Sort logic: 
+    # 1. Relevance
+    # 2. Source priority (CRICOS > IDP > Others) if Australia
+    # 3. Cost (lower first)
+    def sort_key(x):
+        priority = 3
+        if x["country"].lower() == "australia":
+            if "CRICOS" in x["source"]: priority = 1
+            elif "IDP" in x["source"]: priority = 2
+        return (-float(x["relevance"]), priority, x.get("tuition_fee") or 999999)
+
+    all_courses.sort(key=sort_key)
     return all_courses[:limit]
 
 
@@ -314,11 +333,11 @@ Think deeply and carefully. Actually analyze the student's CV line by line — t
 The student has selected SPECIFIC preferred countries. You MUST ONLY recommend universities, courses, and scholarships in those countries. Do NOT mention or suggest any country the student did not select. If the student selected "Australia", only talk about Australia. If they selected "Australia" and "Canada", only talk about those two. This is non-negotiable.
 
 ### BUDGET INTERPRETATION
-The student's budget figure is their TOTAL BUDGET for the ENTIRE course duration (not per year). When comparing against tuition fees:
-- If a course costs $40,000/year and is 2 years, total cost = $80,000
-- Compare this TOTAL against their stated budget
-- Always show both per-year AND total cost
-- Be honest if their budget doesn't cover the full course
+The student's budget figure is their ANNUAL BUDGET (TOTAL COST PER YEAR) in USD. When comparing against tuition fees:
+- Compare their budget directly against the per-year tuition fee.
+- If a course costs $40,000/year and their budget is $30,000/year, explain the gap clearly.
+- Always show the per-year tuition fee.
+- Be honest if their annual budget doesn't cover the tuition and living expenses.
 
 ### TRUTH PROTOCOL (STRICT)
 - For every Course, University, or Scholarship you name, you MUST use the exact name from the JSON.
@@ -586,7 +605,10 @@ async def analyze_profile(
             except (ValueError, TypeError):
                 ielts_score = None
 
-        inferred_level = _infer_level(current_qualification) if current_qualification else None
+        # Level selection: User Choice > Inferred
+        target_level = profile_data.get("target_level")
+        if not target_level:
+            target_level = _infer_level(current_qualification) if current_qualification else None
 
         log.info(
             "advisor_analyze",
@@ -594,15 +616,15 @@ async def analyze_profile(
             subject=target_subject,
             countries=preferred_countries,
             has_cv=bool(cv_text),
-            inferred_level=inferred_level,
+            target_level=target_level,
         )
 
         # Query database
         courses = _query_matching_courses(
-            target_subject, preferred_countries, inferred_level, ielts_score
+            target_subject, preferred_countries, target_level, ielts_score
         )
         scholarships = _query_matching_scholarships(
-            target_subject, preferred_countries, inferred_level, nationality
+            target_subject, preferred_countries, target_level, nationality
         )
         universities = _query_universities(preferred_countries)
         visa_data = _query_visa_data(nationality, preferred_countries)

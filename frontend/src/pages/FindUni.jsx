@@ -329,8 +329,9 @@ export default function FindUni() {
     ielts_speaking: '',
     ielts_listening: '',
     target_subject: '',
+    target_level: '',
     preferred_countries: [],
-    budget_usd: 50000,
+    budget_usd: 30000,
     timeline_months: 12,
     career_goal: '',
     work_experience_years: 0,
@@ -618,14 +619,24 @@ export default function FindUni() {
                     {[3,6,9,12,18,24].map(m => <option key={m} value={m}>{m} months</option>)}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Target Degree Level</label>
+                  <select className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all appearance-none" value={profile.target_level} onChange={e => update('target_level', e.target.value)}>
+                    <option value="">Auto-Detect from CV</option>
+                    <option value="Undergraduate">Undergraduate (Bachelors)</option>
+                    <option value="Postgraduate">Postgraduate (Masters/Grad Dip)</option>
+                    <option value="Doctorate">Doctorate (PhD / Research)</option>
+                    <option value="Vocational">Vocational / Diploma</option>
+                  </select>
+                </div>
               </div>
               {/* Budget */}
               <div className="mb-2">
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  Total Budget (entire course): <span className="text-gray-900 text-base font-bold ml-1">USD ${parseInt(profile.budget_usd).toLocaleString()}</span>
+                  Annual Budget (USD per year): <span className="text-gray-900 text-base font-bold ml-1">USD ${parseInt(profile.budget_usd).toLocaleString()}/yr</span>
                 </label>
-                <input type="range" min="5000" max="200000" step="5000" className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" value={profile.budget_usd} onChange={e => update('budget_usd', e.target.value)} />
-                <div className="flex justify-between text-[10px] text-gray-400 mt-1"><span>$5K</span><span>$50K</span><span>$100K</span><span>$200K</span></div>
+                <input type="range" min="5000" max="100000" step="5000" className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" value={profile.budget_usd} onChange={e => update('budget_usd', e.target.value)} />
+                <div className="flex justify-between text-[10px] text-gray-400 mt-1"><span>$5K</span><span>$25K</span><span>$50K</span><span>$75K</span><span>$100K+</span></div>
               </div>
             </div>
 
