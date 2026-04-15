@@ -68,6 +68,26 @@ def _infer_level(qualification: str) -> Optional[str]:
     return None
 
 
+async def _infer_subject_from_cv(cv_text: str) -> str:
+    """Use a fast LLM pass to infer the logical next subject for this student."""
+    if not cv_text:
+        return ""
+    
+    from src.utils.groq_cascade import non_streaming_groq
+    
+    system = "You are an expert education counselor. Analyze the CV and return ONLY the most likely subject (2-3 words max) the student should study next. Example: 'Computer Science' or 'MBA' or 'Public Health'. No other text."
+    user = f"CV Content:\n{cv_text[:4000]}" # First 4k chars is enough for subject
+    
+    try:
+        # Use a very fast model for this pre-pass
+        res = await non_streaming_groq(system, user, max_tokens=10, temperature=0.0)
+        subject = res.get("content", "").strip().strip("'\"")
+        log.info("inferred_subject", subject=subject)
+        return subject
+    except Exception:
+        return ""
+
+
 # ── Database Queries ────────────────────────────────────────────────────────
 
 def _query_matching_courses(
@@ -93,7 +113,9 @@ def _query_matching_courses(
                 _fuzzy(target_subject, c.get("subject") or ""),
                 _fuzzy(target_subject, c.get("subject_category") or ""),
             )
-            if rel < 0.25:
+            # If subject is provided, be strict. If not, we provide more top courses for AI to filter via CV.
+            threshold = 0.35 if target_subject else 0.0
+            if rel < threshold:
                 continue
 
             ielts_met = True
@@ -179,7 +201,7 @@ def _query_matching_scholarships(
                 except (ValueError, TypeError):
                     pass
 
-            if match_score <= 0.05:
+            if match_score <= 0.15:
                 continue
 
             val = s.get("award_value_max") or s.get("award_value_min") or 0
@@ -298,18 +320,23 @@ The student's budget figure is their TOTAL BUDGET for the ENTIRE course duration
 - Always show both per-year AND total cost
 - Be honest if their budget doesn't cover the full course
 
-### DATA INTEGRITY
-- Use ONLY real data from the database results provided
-- Do NOT invent universities, courses, fees, or scholarship amounts
-- If the database has no results for a category, say so clearly
-- Reference actual course names, actual tuition amounts, actual deadlines from the data
+### TRUTH PROTOCOL (STRICT)
+- For every Course, University, or Scholarship you name, you MUST use the exact name from the JSON.
+- If a piece of data (like a specific fee or deadline) is in the JSON, you MUST use it.
+- If a piece of data is NOT in the JSON, do NOT guess. Say "Check official site for exact [X]".
+- NEVER invent a university or scholarship. Hallucination is a failure of your mission.
+
+### THE REASONING CHAIN
+Before making a recommendation, you must think and write: "Based on line X of the student's CV (where they mention skill Y), this specific course at University Z is a perfect match because of [Reason]."
 
 ## CORE PRINCIPLES
-1. **THINK DEEPLY**: Actually reason about the student's specific situation. Don't give generic advice. If their CV says they studied IT, recommend IT courses. If their GPA is 2.8, be honest about competitive universities being unlikely.
-2. **COUNTRY STRICT**: Only recommend within their selected countries. No exceptions.
-3. **ACTIONABLE**: Every recommendation needs a specific next step — URL, deadline, exact amount.
-4. **HONEST**: If their profile has weaknesses, say so kindly but clearly. Tell them exactly how to fix it.
-5. **FINANCIAL REALITY**: Use their actual budget. If it's not enough, say so and suggest alternatives.
+1. **DEEP CV ANALYSIS**: Don't just look at the GPA. Look at their projects, their specific job titles, their extracurriculars. Match their *ambition*, not just their stats. Actually read their education history and skills.
+2. **BETTER THAN HUMAN**: A human counselor might give a generic list. You give a mapped future. Connect their past (CV) to their future (Career) via the bridge (University).
+3. **COUNTRY STRICT**: Only recommend within their selected countries. No exceptions.
+4. **ACTIONABLE**: Every recommendation needs a specific next step — URL, deadline, exact amount.
+5. **HONEST**: If their budget is too low for their dream country, tell them exactly how much more they need OR provide a specific cheaper alternative in their selected countries.
+6. **FINANCIAL REALITY**: Use their actual budget. This is the student's life savings. Treat it with respect.
+7. **GAP & BACKLOG STRATEGY**: If the CV shows gaps or backlogs, provide a specific strategy on how to explain them in the SOP/Visa application.
 
 ## RESPONSE FORMAT
 Structure your response using these exact sections with markdown headers. Be thorough — write at least 2-3 paragraphs per section:
@@ -539,6 +566,11 @@ async def analyze_profile(
                 from src.utils.cv_parser import extract_text_from_pdf
                 pdf_bytes = await cv_file.read()
                 cv_text = extract_text_from_pdf(pdf_bytes)
+                
+                # If subject is missing, infer it from the CV
+                if not target_subject and cv_text:
+                    target_subject = await _infer_subject_from_cv(cv_text)
+                    profile_data["target_subject"] = target_subject
             except ValueError as e:
                 return JSONResponse(status_code=400, content={"error": str(e)})
             except Exception as e:

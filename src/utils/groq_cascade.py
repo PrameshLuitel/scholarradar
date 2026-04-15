@@ -29,12 +29,14 @@ log = structlog.get_logger("utils.groq_cascade")
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 # Cascade order — first model that succeeds wins
+# We prioritize TPM (Tokens Per Minute) room so large CVs don't crash
 MODELS = [
-    "openai/gpt-oss-120b",
-    "openai/gpt-oss-20b",
-    "qwen/qwen3-32b",
-    "llama-3.3-70b-versatile",
-    "groq/compound",
+    "groq/compound",                           # 70K TPM — best for deep context
+    "meta-llama/llama-4-scout-17b-16e-instruct", # 30K TPM — extremely fast/roomy
+    "llama-3.3-70b-versatile",                 # 12K TPM — balanced fallback
+    "openai/gpt-oss-120b",                     # 8K TPM  — reasoning fallback
+    "openai/gpt-oss-20b",                      # 8K TPM  — secondary reasoning
+    "qwen/qwen3-32b",                          # 6K TPM  — alternative fallback
 ]
 
 # Token pricing per 1M tokens (for cost tracking)
