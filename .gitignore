@@ -17,3 +17,31 @@ claude-skills-main/
 # Scraper checkpoints
 .scholarship_scraper_checkpoint.json
 .course_scraper_checkpoint.json
+
+# IDEs & System
+.vscode/
+.DS_Store
+*.swp
+
+# Environment
+.venv/
+venv/
+ENV/
+.env
+.env.*
+!.env.example
+
+# Build & Logs
+node_modules/
+dist/
+build/
+frontend/out/
+*.log
+*.pyc
+
+# Large Media
+*.mp4
+*.wav
+*.mp3
+*.ogg
+
