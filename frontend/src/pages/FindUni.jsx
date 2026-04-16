@@ -656,10 +656,22 @@ export default function FindUni() {
           if (d === '[DONE]') continue;
           try {
             const ev = JSON.parse(d);
-            if (ev.type === 'metadata') setMetadata(ev);
-            else if (ev.type === 'courses') setCourses(ev.data || []);
-            else if (ev.type === 'scholarships') setScholarships(ev.data || []);
-            else if (ev.type === 'model') setModelInfo(ev);
+            if (ev.type === 'metadata') {
+              console.log('Received metadata:', ev);
+              setMetadata(ev);
+            }
+            else if (ev.type === 'courses') {
+              console.log('Received courses:', ev.data?.length);
+              setCourses(ev.data || []);
+            }
+            else if (ev.type === 'scholarships') {
+              console.log('Received scholarships:', ev.data?.length);
+              setScholarships(ev.data || []);
+            }
+            else if (ev.type === 'model') {
+              console.log('Received model:', ev);
+              setModelInfo(ev);
+            }
             else if (ev.type === 'chunk') {
               setResponseText(p => p + ev.content);
               // Update loading step based on response progress
@@ -668,6 +680,7 @@ export default function FindUni() {
               }
             }
             else if (ev.type === 'status') {
+              console.log('Status:', ev.content);
               // Update loading step based on status message
               const statusMessages = {
                 'analyzing': 0,
@@ -685,14 +698,24 @@ export default function FindUni() {
                 }
               }
             }
-            else if (ev.type === 'done') setDoneInfo(ev);
-            else if (ev.type === 'error') setError(ev.message);
-          } catch (_) {}
+            else if (ev.type === 'done') {
+              console.log('Done:', ev);
+              setDoneInfo(ev);
+            }
+            else if (ev.type === 'error') {
+              console.error('Stream error:', ev.message);
+              setError(ev.message);
+            }
+          } catch (parseError) {
+            console.error('Failed to parse event:', parseError, 'Raw data:', d);
+          }
         }
       }
     } catch (e) {
+      console.error('Submit error:', e);
       setError(e.message || 'Something went wrong.');
     } finally {
+      console.log('Request completed, isAnalyzing set to false');
       setIsAnalyzing(false);
     }
   };
@@ -703,7 +726,7 @@ export default function FindUni() {
   };
 
   const isValid = profile.nationality && profile.preferred_countries.length > 0;
-  const showResults = responseText || isAnalyzing || courses.length > 0;
+  const showResults = responseText || isAnalyzing || courses.length > 0 || scholarships.length > 0 || error;
 
   // ── Render ──────────────────────────────────────────────────────────
 
@@ -1088,14 +1111,17 @@ export default function FindUni() {
               </motion.div>
             )}
 
-            {/* Error */}
-            {error && !responseText && (
-              <div className="bg-white rounded-3xl border border-red-100 shadow-sm p-8">
+            {/* Error - show even if there's partial content */}
+            {error && (
+              <div className="bg-white rounded-3xl border border-red-100 shadow-sm p-8 mb-6">
                 <div className="flex items-start gap-3 text-red-600 mb-4">
                   <AlertCircle className="w-6 h-6 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-base mb-1">Analysis Failed</p>
-                    <p className="text-sm text-gray-500">{error}</p>
+                  <div className="flex-1">
+                    <p className="font-medium text-base mb-1">{responseText ? 'Partial Analysis - Error Occurred' : 'Analysis Failed'}</p>
+                    <p className="text-sm text-gray-600 mb-3">{error}</p>
+                    {responseText && (
+                      <p className="text-xs text-gray-500">The analysis below is incomplete. Please try again for full results.</p>
+                    )}
                   </div>
                 </div>
                 <button onClick={reset} className="px-5 py-2 rounded-full text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">Try again</button>
