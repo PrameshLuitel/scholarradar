@@ -101,7 +101,7 @@ def _query_matching_courses(
     ielts_score: Optional[float] = None,
     limit: int = 15,
 ) -> list[dict]:
-    """Query courses matching the student's profile."""
+    """Query courses matching the student's profile with rich location data."""
     db = _get_db()
     all_courses = []
 
@@ -136,6 +136,10 @@ def _query_matching_courses(
             currency = c.get("currency", "AUD")
             source = (c.get("source") or "").upper()
             
+            # Get state/region for location-based filtering
+            state = c.get("state") or ""
+            city = c.get("city") or ""
+            
             # Basic match reasoning
             match_reasons = []
             if rel >= 0.8: match_reasons.append("Perfect subject match")
@@ -143,23 +147,37 @@ def _query_matching_courses(
             
             if ielts_met: match_reasons.append("Meets English requirements")
             
-            # If university is high-ranked (world_ranking is in universities table, but we don't have it here yet,
-            # we can add a generic high-quality tag if relevance is high and fee is standard)
-
+            # Add location info for Australia (CRICOS data has states)
+            location_info = ""
+            if country.lower() == "australia" and state:
+                location_info = f"{city}, {state}"
+            elif city:
+                location_info = city
+            
             all_courses.append({
                 "name": c.get("name"),
                 "university": c.get("university"),
                 "country": c.get("country"),
-                "city": c.get("city"),
-                "state": c.get("state"),
+                "city": city,
+                "state": state,
+                "location": location_info,
                 "level": c.get("level"),
                 "tuition_fee": fee,
                 "tuition_display": f"{currency} {fee:,.0f}/yr" if fee else "Contact university",
                 "duration_months": c.get("duration_months"),
+                "duration_years": round(c.get("duration_months", 0) / 12, 1) if c.get("duration_months") else None,
                 "ielts_required": c.get("ielts_overall"),
+                "ielts_breakdown": {
+                    "overall": c.get("ielts_overall"),
+                    "reading": c.get("ielts_reading"),
+                    "writing": c.get("ielts_writing"),
+                    "speaking": c.get("ielts_speaking"),
+                    "listening": c.get("ielts_listening"),
+                },
                 "ielts_met": ielts_met,
                 "gpa_requirement": c.get("gpa_requirement"),
                 "entry_qualification": c.get("entry_qualification"),
+                "start_dates": c.get("start_dates", []),
                 "apply_url": c.get("apply_url"),
                 "source_url": c.get("source_url"),
                 "cricos_code": c.get("cricos_code"),
@@ -191,7 +209,7 @@ def _query_matching_scholarships(
     nationality: str,
     limit: int = 15,
 ) -> list[dict]:
-    """Query scholarships matching the student's profile."""
+    """Query scholarships matching the student's profile with rich location data."""
     db = _get_db()
     all_scholarships = []
     today = date.today()
@@ -243,20 +261,30 @@ def _query_matching_scholarships(
 
             val = s.get("award_value_max") or s.get("award_value_min") or 0
             curr = s.get("award_currency", "AUD")
+            
+            # Get location data
+            city = s.get("city") or ""
+            state = ""  # Scholarships table doesn't have state, but we can infer from universities if needed
 
             all_scholarships.append({
                 "title": s.get("title"),
                 "university": s.get("university"),
                 "country": s.get("country"),
+                "city": city,
                 "funding_type": s.get("funding_type"),
                 "value": f"{curr} {val:,.0f}" if val else "Contact provider",
                 "value_numeric": val,
+                "award_min": s.get("award_value_min"),
+                "award_max": s.get("award_value_max"),
+                "currency": curr,
                 "deadline": str(s["deadline"]) if s.get("deadline") else None,
                 "eligibility": s.get("eligibility"),
+                "description": s.get("description"),
                 "match_score": round(float(match_score), 3),
                 "why_matched": reasons,
                 "apply_url": s.get("apply_url"),
                 "source_url": s.get("source_url"),
+                "source": s.get("source"),
             })
 
     all_scholarships.sort(key=lambda x: float(x["match_score"]), reverse=True)
@@ -264,7 +292,7 @@ def _query_matching_scholarships(
 
 
 def _query_universities(countries: list[str], limit: int = 10) -> list[dict]:
-    """Get top universities in preferred countries."""
+    """Get top universities in preferred countries with complete data."""
     db = _get_db()
     all_unis = []
     for country in countries:
@@ -277,19 +305,29 @@ def _query_universities(countries: list[str], limit: int = 10) -> list[dict]:
                 "name": u.get("name"),
                 "country": u.get("country"),
                 "city": u.get("city"),
+                "state": u.get("state"),
                 "world_ranking": u.get("world_ranking"),
+                "subject_rankings": u.get("subject_rankings", {}),
                 "acceptance_rate": u.get("acceptance_rate"),
-                "ielts_minimum": u.get("ielts_minimum"),
+                "total_students": u.get("total_students"),
+                "international_students": u.get("international_students"),
                 "tuition_min": u.get("tuition_min"),
                 "tuition_max": u.get("tuition_max"),
+                "currency": u.get("currency", "AUD"),
+                "ielts_minimum": u.get("ielts_minimum"),
+                "popular_subjects": u.get("popular_subjects", []),
+                "facilities": u.get("facilities", []),
+                "accommodation_cost_min": u.get("accommodation_cost_min"),
+                "accommodation_cost_max": u.get("accommodation_cost_max"),
                 "website": u.get("website"),
+                "provider_code": u.get("provider_code"),
             })
     all_unis.sort(key=lambda x: x.get("world_ranking") or 9999)
     return all_unis[:limit]
 
 
 def _query_visa_data(nationality: str, countries: list[str]) -> list[dict]:
-    """Get visa requirements for student's nationality → each country."""
+    """Get complete visa requirements for student's nationality → each country."""
     db = _get_db()
     results = []
     for country in countries:
@@ -302,10 +340,16 @@ def _query_visa_data(nationality: str, countries: list[str]) -> list[dict]:
             results.append({
                 "country": country,
                 "visa_type": v.get("visa_type"),
+                "visa_subclass": v.get("visa_subclass"),
                 "financial_requirement_aud": v.get("financial_requirement_aud"),
                 "processing_weeks": f"{v.get('processing_weeks_min', '?')}–{v.get('processing_weeks_max', '?')}",
+                "processing_weeks_min": v.get("processing_weeks_min"),
+                "processing_weeks_max": v.get("processing_weeks_max"),
                 "work_rights_hours": v.get("work_rights_hours_per_week"),
+                "required_documents": v.get("required_documents", []),
                 "health_requirements": v.get("health_requirements"),
+                "notes": v.get("notes"),
+                "source_url": v.get("source_url"),
             })
         else:
             results.append({
@@ -316,24 +360,35 @@ def _query_visa_data(nationality: str, countries: list[str]) -> list[dict]:
 
 
 def _query_cost_of_living(countries: list[str]) -> list[dict]:
-    """Get cost of living data for top cities in each country."""
+    """Get comprehensive cost of living data for top cities in each country."""
     db = _get_db()
     results = []
     for country in countries:
         rows = (db.table("cost_of_living").select("*")
                 .ilike("country", country.strip())
-                .limit(3).execute()).data or []
+                .limit(5).execute()).data or []
         for c in rows:
             results.append({
                 "city": c.get("city"),
                 "country": c.get("country"),
-                "rent_shared_range": f"{c.get('rent_shared_min', '?')}–{c.get('rent_shared_max', '?')}",
+                "rent_shared_min": c.get("rent_shared_min"),
+                "rent_shared_max": c.get("rent_shared_max"),
+                "rent_private_min": c.get("rent_private_min"),
+                "rent_private_max": c.get("rent_private_max"),
                 "food_monthly": c.get("food_monthly"),
                 "transport_monthly": c.get("transport_monthly"),
+                "utilities_monthly": c.get("utilities_monthly"),
+                "internet_monthly": c.get("internet_monthly"),
                 "total_monthly_min": c.get("total_monthly_min"),
                 "total_monthly_max": c.get("total_monthly_max"),
                 "part_time_wage_hourly": c.get("part_time_wage_hourly"),
                 "currency": c.get("currency", "AUD"),
+                "weekly_budget": {
+                    "shared_rent_min": round((c.get("rent_shared_min") or 0) / 4.33, 2),
+                    "shared_rent_max": round((c.get("rent_shared_max") or 0) / 4.33, 2),
+                    "food": round((c.get("food_monthly") or 0) / 4.33, 2),
+                    "transport": round((c.get("transport_monthly") or 0) / 4.33, 2),
+                },
             })
     return results
 
@@ -390,9 +445,36 @@ Your goal is to provide genuinely life-changing guidance that helps students mak
 ## DATA USAGE RULES
 1. **Use tools extensively** - search_courses, search_scholarships, get_visa_requirements, get_universities, etc.
 2. **Never hallucinate** - every fact must come from tool results
-3. **Quote exact data** - use exact names, fees, URLs from database
+3. **Quote exact data** - use exact names, fees, URLs, CRICOS codes from database
 4. **If data missing** - say "Check official website" rather than guessing
 5. **Multiple tool calls** - call tools for each country they selected
+
+## LOCATION INTELLIGENCE (CRITICAL)
+You have access to DETAILED location data - USE IT:
+
+### For Australia (CRICOS Data):
+- EVERY course has: city, state, CRICOS code, provider code
+- States: NSW, VIC, QLD, WA, SA, TAS, ACT, NT
+- Major cities: Sydney (NSW), Melbourne (VIC), Brisbane (QLD), Perth (WA), Adelaide (SA)
+- Regional areas: Often cheaper living, better PR pathways, additional visa points
+- ALWAYS mention the state - students need to know for visa, work, lifestyle decisions
+- CRICOS code is OFFICIAL - proves the course is government-approved for international students
+
+### For UK:
+- Cities: London, Manchester, Birmingham, Edinburgh, Glasgow, etc.
+- London is expensive but has more opportunities
+- Other cities are cheaper with good job markets
+
+### For Other Countries:
+- Use city data from database
+- Mention if it's a major hub for their field
+- Note cost of living differences between cities
+
+### Location Recommendations:
+- If budget is tight: Suggest regional/cheaper cities
+- If career-focused: Suggest industry hubs (e.g., Sydney for tech, Melbourne for finance)
+- If PR-focused: Mention regional areas with additional migration points
+- Always explain WHY a location is good/bad for their specific situation
 
 ## RESPONSE STRUCTURE
 Use these exact section headers. Write 2-4 substantial paragraphs per section:
@@ -409,13 +491,15 @@ Analyze their complete profile in detail:
 ### 🎓 Best-Match Universities & Courses
 Recommend 3-5 specific courses from database results. For EACH:
 - **Why it's perfect for them** (reference their CV/background specifically)
-- University name, course name, location
-- Annual tuition fee AND total course cost
+- University name, course name, location (city AND state/region - be specific!)
+- Annual tuition fee AND total course cost (tuition × years)
 - Entry requirements vs their actual qualifications
-- IELTS requirement vs their score (or what they need)
+- IELTS requirement vs their score (show full breakdown: overall, reading, writing, speaking, listening)
 - Direct application URL from database
+- CRICOS code (if Australia) - this is official government registration
 - Admission probability: High/Medium/Low with honest reasoning
 - What makes this course stand out for their career
+- Location benefits: Is this city good for their field? Job opportunities? Cost of living?
 
 ### 💰 Scholarships You Can Win
 Highlight 3-5 scholarships from results. For EACH:
@@ -428,24 +512,28 @@ Highlight 3-5 scholarships from results. For EACH:
 
 ### 💵 Complete Financial Breakdown
 Be brutally honest with numbers:
-- Total cost for top 3 choices (tuition × years + living costs)
+- Total cost for top 3 choices (tuition × years + living costs for full duration)
 - Their budget vs actual costs — is it realistic?
 - Scholarships that could reduce costs and by how much
-- Part-time work: hourly wage, max hours/week, monthly earnings potential
-- If budget insufficient: specific cheaper alternatives in their countries
-- Simple cost comparison table
+- Part-time work: hourly wage (from database), max hours/week, realistic monthly earnings
+- If budget insufficient: specific cheaper alternatives in their countries (different cities/states)
+- Simple cost comparison table showing: Tuition | Living | Total | Scholarship | Net Cost
 - Honest assessment: "Your budget of $X is/isn't sufficient because..."
+- Show weekly budget breakdown (rent, food, transport, utilities) for recommended cities
+- Include accommodation cost ranges (shared vs private) from university data
 
 ### 🛂 Your Visa Pathway
 For their nationality to each destination:
-- Exact visa subclass/type and requirements
-- Financial proof required (specific amount in local currency)
-- Processing time and when to apply
-- Work rights during and after study
+- Exact visa subclass/type and requirements (from database)
+- Financial proof required (specific amount in local currency - from database)
+- Processing time (min-max weeks from database) and when to apply
+- Work rights during study (hours/week from database) and after graduation
 - Post-study work visa duration
+- Required documents checklist (from database)
 - Honest visa approval likelihood for their nationality
 - Specific red flags to avoid in their application
 - Documents they need to start preparing NOW
+- Health insurance requirements (OSHC for Australia, etc.)
 
 ### 📝 Test Score Strategy
 If they have IELTS/test scores:
@@ -473,6 +561,8 @@ Create specific timeline from NOW to their target intake:
 - How this connects to their stated career goal
 - Companies/employers that hire graduates from their recommended courses
 - Skills they should build during study to maximize job prospects
+- Location-specific advice: Which cities/states have best job opportunities for their field?
+- Industry hubs: e.g., Sydney/Melbourne for tech, Perth for mining, etc.
 
 ### ⚡ 5 Things to Do THIS WEEK
 Number 1-5, most urgent first. Be hyper-specific:
@@ -617,12 +707,15 @@ async def analyze_profile(
     Returns a text/event-stream (SSE) with the AI response.
     """
     started = time.time()
+    log.info("advisor_request_received")
 
     try:
         # Parse profile JSON
         try:
             profile_data = json.loads(profile)
-        except json.JSONDecodeError:
+            log.info("profile_parsed", keys=list(profile_data.keys()))
+        except json.JSONDecodeError as e:
+            log.error("invalid_profile_json", error=str(e))
             return JSONResponse(
                 status_code=400,
                 content={"error": "Invalid profile JSON"},
@@ -751,31 +844,40 @@ async def analyze_profile(
             cost_data=cost_data,
         )
 
-        # Stream response via Agentic Loop
+        # Stream response directly - no complex agent loop
         async def event_stream():
-            agent = AgentRunner(system_prompt=SYSTEM_PROMPT, max_iterations=6)
-            
-            # Send metadata first so frontend can display results
-            yield f"data: {json.dumps({'type': 'metadata', 'courses_found': len(courses), 'scholarships_found': len(scholarships)})}\n\n"
-            
-            # Send courses data
-            if courses:
-                yield f"data: {json.dumps({'type': 'courses', 'data': courses})}\n\n"
-            
-            # Send scholarships data
-            if scholarships:
-                yield f"data: {json.dumps({'type': 'scholarships', 'data': scholarships})}\n\n"
-            
-            yield f"data: {json.dumps({'type': 'status', 'content': 'Analyzing your profile...'})}\n\n"
-
             try:
-                async for event in agent.run(user_prompt):
+                # Send metadata first so frontend can display results
+                log.info("sending_metadata", courses=len(courses), scholarships=len(scholarships))
+                yield f"data: {json.dumps({'type': 'metadata', 'courses_found': len(courses), 'scholarships_found': len(scholarships)})}\n\n"
+                
+                # Send courses data
+                if courses:
+                    log.info("sending_courses", count=len(courses))
+                    yield f"data: {json.dumps({'type': 'courses', 'data': courses})}\n\n"
+                
+                # Send scholarships data
+                if scholarships:
+                    log.info("sending_scholarships", count=len(scholarships))
+                    yield f"data: {json.dumps({'type': 'scholarships', 'data': scholarships})}\n\n"
+                
+                yield f"data: {json.dumps({'type': 'status', 'content': 'Generating your personalized analysis...'})}\n\n"
+
+                # Use simple streaming instead of complex agent
+                from src.utils.groq_cascade import stream_groq_response
+                
+                log.info("starting_llm_stream", prompt_length=len(user_prompt))
+                
+                async for event in stream_groq_response(
+                    system_prompt=SYSTEM_PROMPT,
+                    user_prompt=user_prompt,
+                    max_tokens=4096,
+                    temperature=0.7,
+                ):
                     if event["type"] == "model":
                         yield f"data: {json.dumps({'type': 'model', 'model': event['model'], 'display_name': get_model_display_name(event['model'])})}\n\n"
                     elif event["type"] == "chunk":
                         yield f"data: {json.dumps({'type': 'chunk', 'content': event['content']})}\n\n"
-                    elif event["type"] == "status":
-                        yield f"data: {json.dumps({'type': 'status', 'content': event['message']})}\n\n"
                     elif event["type"] == "done":
                         total_time = round(time.time() - started, 2)
                         done_payload = {
@@ -787,13 +889,17 @@ async def analyze_profile(
                             'total_time_seconds': total_time
                         }
                         yield f"data: {json.dumps(done_payload)}\n\n"
+                        log.info("stream_complete", total_time=total_time)
                     elif event["type"] == "error":
                         yield f"data: {json.dumps({'type': 'error', 'message': event['message']})}\n\n"
+                        log.error("stream_error", message=event['message'])
 
                 yield "data: [DONE]\n\n"
+                log.info("advisor_stream_finished")
+                
             except Exception as e:
-                log.error("agent_run_failed", error=str(e))
-                yield f"data: {json.dumps({'type': 'error', 'message': f'Agent execution failed: {str(e)}'})}\n\n"
+                log.error("advisor_stream_failed", error=str(e), exc_info=True)
+                yield f"data: {json.dumps({'type': 'error', 'message': f'Analysis failed: {str(e)}'})}\n\n"
 
         return StreamingResponse(
             event_stream(),
