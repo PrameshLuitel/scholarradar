@@ -477,7 +477,31 @@ export default function FindUni() {
             else if (ev.type === 'courses') setCourses(ev.data || []);
             else if (ev.type === 'scholarships') setScholarships(ev.data || []);
             else if (ev.type === 'model') setModelInfo(ev);
-            else if (ev.type === 'chunk') setResponseText(p => p + ev.content);
+            else if (ev.type === 'chunk') {
+              setResponseText(p => p + ev.content);
+              // Update loading step based on response progress
+              if (loadingStep < STEPS.length - 1) {
+                setLoadingStep(prev => Math.min(prev + 1, STEPS.length - 1));
+              }
+            }
+            else if (ev.type === 'status') {
+              // Update loading step based on status message
+              const statusMessages = {
+                'analyzing': 0,
+                'querying': 1,
+                'matching': 2,
+                'checking': 3,
+                'crunching': 4,
+                'writing': 5,
+              };
+              const statusLower = (ev.content || '').toLowerCase();
+              for (const [key, step] of Object.entries(statusMessages)) {
+                if (statusLower.includes(key)) {
+                  setLoadingStep(step);
+                  break;
+                }
+              }
+            }
             else if (ev.type === 'done') setDoneInfo(ev);
             else if (ev.type === 'error') setError(ev.message);
           } catch (_) {}
