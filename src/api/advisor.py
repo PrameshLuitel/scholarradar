@@ -361,7 +361,6 @@ The student's budget figure is their ANNUAL BUDGET (TOTAL COST PER YEAR) in USD.
 
 ### THE REASONING CHAIN
 Before making a recommendation, you must THINK: "Based on the student's background in X, this course at Y is a match because of tool-verified parameters Z."
-"""
 
 ## CORE PRINCIPLES
 1. **DEEP CV ANALYSIS**: Don't just look at the GPA. Look at their projects, their specific job titles, their extracurriculars. Match their *ambition*, not just their stats. Actually read their education history and skills.
@@ -671,14 +670,15 @@ async def analyze_profile(
                         yield f"data: {json.dumps({'type': 'status', 'content': event['message']})}\n\n"
                     elif event["type"] == "done":
                         total_time = round(time.time() - started, 2)
-                        yield f"data: {json.dumps({
-                            'type': 'done', 
-                            'model': event['model'], 
-                            'display_name': get_model_display_name(event['model']), 
-                            'usage': event.get('usage', {}), 
-                            'cost_usd': event.get('cost_usd', 0), 
+                        done_payload = {
+                            'type': 'done',
+                            'model': event['model'],
+                            'display_name': get_model_display_name(event['model']),
+                            'usage': event.get('usage', {}),
+                            'cost_usd': event.get('cost_usd', 0),
                             'total_time_seconds': total_time
-                        })}\n\n"
+                        }
+                        yield f"data: {json.dumps(done_payload)}\n\n"
                     elif event["type"] == "error":
                         yield f"data: {json.dumps({'type': 'error', 'message': event['message']})}\n\n"
 
