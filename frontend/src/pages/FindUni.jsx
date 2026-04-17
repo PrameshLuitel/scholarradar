@@ -4,7 +4,8 @@ import {
   Upload, FileText, GraduationCap, Globe, DollarSign,
   Send, X, CheckCircle, AlertCircle, Loader2,
   ArrowRight, BookOpen, Target, Clock, Award,
-  Info, ExternalLink, MapPin, Calendar, TrendingUp, ShieldCheck
+  Info, ExternalLink, MapPin, Calendar, TrendingUp, ShieldCheck,
+  Sparkles, Zap, Brain,
 } from 'lucide-react';
 
 // ── Data ────────────────────────────────────────────────────────────────────
@@ -16,7 +17,6 @@ const COUNTRIES = [
   'Singapore', 'Malaysia', 'Switzerland',
 ];
 
-// State/Region data for countries that have it
 const COUNTRY_STATES = {
   'australia': [
     'NSW (Sydney)', 'VIC (Melbourne)', 'QLD (Brisbane)', 'WA (Perth)',
@@ -70,6 +70,22 @@ const SUBJECT_SUGGESTIONS = [
 ];
 
 
+// ── Auto-Fill Badge ─────────────────────────────────────────────────────────
+
+function AutoFilledBadge({ fieldName }) {
+  return (
+    <motion.span
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-700 ml-2"
+    >
+      <Sparkles className="w-2.5 h-2.5" />
+      From CV
+    </motion.span>
+  );
+}
+
+
 // ── Course Card ─────────────────────────────────────────────────────────────
 
 function CourseCard({ course, index, allCourses, allScholarships }) {
@@ -77,30 +93,30 @@ function CourseCard({ course, index, allCourses, allScholarships }) {
   const relevance = Math.round((course.relevance || 0) * 100);
   const showCodes = course.country?.toLowerCase() === 'australia' && (course.cricos_code || course.provider_code);
 
-  // Find related scholarships for this university
   const relatedScholarships = allScholarships.filter(s => 
     s.university?.toLowerCase() === course.university?.toLowerCase()
   ).slice(0, 3);
 
-  // Find alternative courses at same university
   const alternativeCourses = allCourses.filter(c => 
     c.university?.toLowerCase() === course.university?.toLowerCase() && 
     c.name !== course.name
   ).slice(0, 3);
 
-  // Calculate total course cost
   const totalCost = course.tuition_fee && course.duration_months 
     ? course.tuition_fee * (course.duration_months / 12)
     : null;
   
-  // Calculate potential scholarship savings
   const topScholarship = relatedScholarships[0];
-  const scholarshipAmount = topScholarship?.amount ? 
-    (typeof topScholarship.amount === 'string' ? 
-      parseFloat(topScholarship.amount.replace(/[^0-9.]/g, '')) : 
-      topScholarship.amount) : 0;
+  const scholarshipAmount = topScholarship?.value_numeric || 0;
   const costAfterScholarship = totalCost && scholarshipAmount > 0 ? 
     totalCost - scholarshipAmount : null;
+
+  // Admission probability colors
+  const admissionColors = {
+    'High': 'bg-green-50 text-green-700 border-green-200',
+    'Medium': 'bg-amber-50 text-amber-700 border-amber-200',
+    'Low': 'bg-red-50 text-red-700 border-red-200',
+  };
 
   return (
     <motion.div
@@ -109,17 +125,23 @@ function CourseCard({ course, index, allCourses, allScholarships }) {
       transition={{ delay: index * 0.05, duration: 0.3 }}
       className="bg-white rounded-2xl border border-gray-100 hover:shadow-md transition-shadow group relative overflow-hidden"
     >
-      {/* Clickable Card Header */}
       <div 
         onClick={() => setIsExpanded(!isExpanded)}
         className="p-5 cursor-pointer"
       >
-        {/* Reasoning Badge */}
-        <div className="flex items-center gap-1.5 mb-3">
+        {/* Top badges */}
+        <div className="flex items-center gap-1.5 mb-3 flex-wrap">
           <div className="px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[10px] font-bold text-blue-600 uppercase tracking-tight">
             {course.is_cricos ? 'CRICOS Verified' : 'Verified'}
           </div>
-          <span className="text-[11px] font-medium text-gray-500 italic">{course.match_reason}</span>
+          {course.admission_probability && (
+            <div className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-tight ${admissionColors[course.admission_probability] || 'bg-gray-50 text-gray-600'}`}>
+              {course.admission_probability} Chance
+            </div>
+          )}
+          {course.match_reason && (
+            <span className="text-[11px] font-medium text-gray-500 italic">{course.match_reason}</span>
+          )}
           <span className="ml-auto text-[10px] text-gray-400 font-medium">
             {isExpanded ? 'Click to collapse ▲' : 'Click for details ▼'}
           </span>
@@ -172,6 +194,9 @@ function CourseCard({ course, index, allCourses, allScholarships }) {
           )}
           {course.ielts_met === true && course.ielts_required && (
             <span className="px-2 py-0.5 rounded-md bg-green-50 text-green-700 text-[10px] font-bold uppercase tracking-wider">IELTS ✓ ({course.ielts_required})</span>
+          )}
+          {course.ielts_met === false && course.ielts_required && (
+            <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-600 text-[10px] font-bold uppercase tracking-wider">IELTS: Need {course.ielts_required} (gap: {course.ielts_gap})</span>
           )}
         </div>
 
@@ -380,9 +405,18 @@ function ScholarshipCard({ scholarship, index }) {
           <h4 className="font-semibold text-gray-900 text-sm leading-snug mb-1 line-clamp-2">{scholarship.title}</h4>
           <p className="text-xs text-gray-500">{scholarship.university} • {scholarship.country}</p>
         </div>
-        {isUrgent && (
-          <span className="flex-shrink-0 px-2 py-0.5 rounded-md bg-red-50 text-red-600 text-[10px] font-bold uppercase animate-pulse">Urgent</span>
-        )}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {isUrgent && (
+            <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-600 text-[10px] font-bold uppercase animate-pulse">Urgent</span>
+          )}
+          <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-[10px] font-bold ${
+            score >= 60 ? 'bg-green-50 text-green-700' :
+            score >= 30 ? 'bg-blue-50 text-blue-700' :
+            'bg-gray-50 text-gray-600'
+          }`}>
+            {score}%
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center flex-wrap gap-2 mb-3">
@@ -390,7 +424,7 @@ function ScholarshipCard({ scholarship, index }) {
           <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium ${
             scholarship.funding_type === 'full' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
           }`}>
-            {scholarship.funding_type === 'full' ? 'Fully Funded' : 'Partial'}
+            {scholarship.funding_type === 'full' ? '🌟 Fully Funded' : 'Partial'}
           </span>
         )}
         {scholarship.deadline && (
@@ -424,7 +458,6 @@ function ScholarshipCard({ scholarship, index }) {
 
 // ── Markdown Renderer ───────────────────────────────────────────────────────
 
-// Section header config for styled rendering
 const SECTION_CONFIG = {
   '🎯': { color: 'blue', icon: Target, label: 'Profile Analysis' },
   '🎓': { color: 'indigo', icon: GraduationCap, label: 'Universities & Courses' },
@@ -440,7 +473,6 @@ const SECTION_CONFIG = {
 function MarkdownResponse({ text }) {
   if (!text) return null;
 
-  // Split into sections by h3 headers (### emoji Section Name)
   const sections = [];
   let currentSection = { title: '', emoji: '', lines: [] };
 
@@ -466,7 +498,6 @@ function MarkdownResponse({ text }) {
         const content = section.lines.join('\n').trim();
         if (!content && !section.title) return null;
 
-        // If no matching config, render as plain section
         if (!section.title) {
           return (
             <div key={idx} className="text-sm text-gray-600 leading-relaxed">
@@ -498,12 +529,10 @@ function MarkdownResponse({ text }) {
             transition={{ delay: 0.1, duration: 0.3 }}
             className="bg-white rounded-2xl border border-gray-100 overflow-hidden"
           >
-            {/* Section header */}
             <div className={`px-5 py-3 border-b flex items-center gap-2.5 ${headerColor}`}>
               <IconComp className="w-4 h-4 flex-shrink-0" />
               <span className="text-sm font-semibold">{section.emoji} {section.title}</span>
             </div>
-            {/* Section content */}
             <div className="px-5 py-4 text-sm text-gray-700 leading-relaxed">
               <RenderLines text={content} />
             </div>
@@ -519,12 +548,24 @@ function RenderLines({ text }) {
   return text.split('\n').map((line, i) => {
     if (!line.trim()) return <div key={i} className="h-2" />;
 
-    // Sub-headers
     if (line.startsWith('#### ')) {
       return <h4 key={i} className="font-semibold text-gray-900 mt-4 mb-1.5 text-sm">{line.replace(/^#### /, '')}</h4>;
     }
 
-    // Numbered items
+    // Table rows
+    if (line.startsWith('|') && line.endsWith('|')) {
+      const cells = line.split('|').filter(Boolean).map(c => c.trim());
+      // Skip separator rows
+      if (cells.every(c => /^[-:]+$/.test(c))) return null;
+      const isHeader = i === 0 || (text.split('\n')[i + 1] || '').match(/^\|[-:|]+\|$/);
+      return (
+        <div key={i} className={`grid gap-2 px-2 py-1.5 text-xs ${isHeader ? 'font-bold bg-gray-50 rounded-t-lg' : 'border-b border-gray-50'}`}
+          style={{ gridTemplateColumns: `repeat(${cells.length}, minmax(0, 1fr))` }}>
+          {cells.map((cell, ci) => <span key={ci}><InlineText text={cell} /></span>)}
+        </div>
+      );
+    }
+
     if (/^\d+\.\s/.test(line)) {
       return (
         <div key={i} className="flex gap-2.5 mb-2 pl-0.5">
@@ -534,7 +575,6 @@ function RenderLines({ text }) {
       );
     }
 
-    // Bullets
     if (line.startsWith('- ') || line.startsWith('* ')) {
       return (
         <div key={i} className="flex gap-2.5 mb-1.5 pl-1">
@@ -544,10 +584,8 @@ function RenderLines({ text }) {
       );
     }
 
-    // Horizontal rule
     if (line.match(/^---+$/)) return <hr key={i} className="border-gray-100 my-4" />;
 
-    // Regular paragraph
     return <p key={i} className="mb-2"><InlineText text={line} /></p>;
   });
 }
@@ -562,11 +600,85 @@ function InlineText({ text }) {
 }
 
 
+// ── CV Analysis Summary Card ────────────────────────────────────────────────
+
+function CVAnalysisSummary({ analysis }) {
+  if (!analysis || Object.keys(analysis).length === 0) return null;
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gradient-to-br from-emerald-50 to-blue-50 rounded-2xl border border-emerald-200/50 p-6 mb-6"
+    >
+      <div className="flex items-center gap-2 mb-4">
+        <Brain className="w-5 h-5 text-emerald-600" />
+        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">CV Intelligence Summary</h3>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {analysis.education_summary && (
+          <div className="bg-white/70 rounded-xl p-3 border border-white">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Education</p>
+            <p className="text-xs text-gray-700">{analysis.education_summary}</p>
+          </div>
+        )}
+        {analysis.target_subject && (
+          <div className="bg-white/70 rounded-xl p-3 border border-white">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Recommended Subject</p>
+            <p className="text-xs text-gray-700 font-semibold">{analysis.target_subject}</p>
+          </div>
+        )}
+        {analysis.career_goal && (
+          <div className="bg-white/70 rounded-xl p-3 border border-white">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Career Direction</p>
+            <p className="text-xs text-gray-700">{analysis.career_goal}</p>
+          </div>
+        )}
+        {analysis.skills && analysis.skills.length > 0 && (
+          <div className="bg-white/70 rounded-xl p-3 border border-white">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Key Skills</p>
+            <div className="flex flex-wrap gap-1">
+              {(Array.isArray(analysis.skills) ? analysis.skills : [analysis.skills]).slice(0, 6).map((s, i) => (
+                <span key={i} className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-medium">{s}</span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {analysis.strengths && analysis.strengths.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {(Array.isArray(analysis.strengths) ? analysis.strengths : [analysis.strengths]).map((s, i) => (
+            <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100/70 text-emerald-800 text-[11px] font-medium">
+              <CheckCircle className="w-3 h-3" /> {s}
+            </span>
+          ))}
+        </div>
+      )}
+      
+      {analysis.gaps && analysis.gaps.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {(Array.isArray(analysis.gaps) ? analysis.gaps : [analysis.gaps]).map((g, i) => (
+            <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100/70 text-amber-800 text-[11px] font-medium">
+              <AlertCircle className="w-3 h-3" /> {g}
+            </span>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+
 // ── Main Component ──────────────────────────────────────────────────────────
 
 export default function FindUni() {
   const [cvFile, setCvFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [cvAnalysis, setCvAnalysis] = useState(null);
+  const [autoFilledFields, setAutoFilledFields] = useState(new Set());
   const [profile, setProfile] = useState({
     nationality: '',
     current_qualification: '',
@@ -579,7 +691,7 @@ export default function FindUni() {
     target_subject: '',
     target_level: '',
     preferred_countries: [],
-    preferred_states: [],  // NEW: State/region filtering
+    preferred_states: [],
     budget_usd: 30000,
     timeline_months: 12,
     career_goal: '',
@@ -631,7 +743,6 @@ export default function FindUni() {
       preferred_countries: p.preferred_countries.includes(c)
         ? p.preferred_countries.filter(x => x !== c)
         : [...p.preferred_countries, c],
-      // Clear states when country is deselected
       preferred_states: p.preferred_countries.includes(c)
         ? p.preferred_states
         : [],
@@ -651,13 +762,11 @@ export default function FindUni() {
     setProfile(p => {
       const currentStates = [...p.preferred_states];
       if (allSelected) {
-        // Deselect all states for this country
         return {
           ...p,
           preferred_states: currentStates.filter(s => !states.includes(s)),
         };
       } else {
-        // Select all states for this country
         const newStates = [...new Set([...currentStates, ...states])];
         return {
           ...p,
@@ -667,14 +776,90 @@ export default function FindUni() {
     });
   };
 
+  // ── CV Auto-Parse on Upload ──────────────────────────────────────────
+
+  const handleCvUpload = async (file) => {
+    if (!file || file.type !== 'application/pdf') return;
+    setCvFile(file);
+    setIsParsing(true);
+    setCvAnalysis(null);
+    setAutoFilledFields(new Set());
+    
+    try {
+      const fd = new FormData();
+      fd.append('cv_file', file);
+      
+      const res = await fetch('/api/advisor/parse-cv', { method: 'POST', body: fd });
+      
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'CV parsing failed' }));
+        console.error('CV parse error:', err);
+        setIsParsing(false);
+        return;
+      }
+      
+      const data = await res.json();
+      
+      if (data.success && data.extracted_fields) {
+        const fields = data.extracted_fields;
+        setCvAnalysis(fields);
+        
+        // Auto-fill form fields
+        const newAutoFilled = new Set();
+        const fieldMapping = {
+          nationality: 'nationality',
+          current_qualification: 'current_qualification',
+          gpa: 'gpa',
+          ielts_overall: 'ielts_overall',
+          ielts_reading: 'ielts_reading',
+          ielts_writing: 'ielts_writing',
+          ielts_speaking: 'ielts_speaking',
+          ielts_listening: 'ielts_listening',
+          target_subject: 'target_subject',
+          career_goal: 'career_goal',
+          work_experience_years: 'work_experience_years',
+        };
+        
+        setProfile(prev => {
+          const updated = { ...prev };
+          for (const [cvKey, formKey] of Object.entries(fieldMapping)) {
+            if (fields[cvKey] && !prev[formKey]) {
+              updated[formKey] = String(fields[cvKey]);
+              newAutoFilled.add(formKey);
+            }
+          }
+          return updated;
+        });
+        
+        setAutoFilledFields(newAutoFilled);
+        
+        // Show IELTS detail if any band scores were detected
+        if (fields.ielts_reading || fields.ielts_writing || fields.ielts_speaking || fields.ielts_listening) {
+          setShowIeltsDetail(true);
+        }
+        
+        console.log('CV auto-fill complete:', fields);
+      }
+    } catch (e) {
+      console.error('CV parse failed:', e);
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
   // Subject autocomplete
   const onSubjectChange = (v) => {
     update('target_subject', v);
-    setSuggestions(v.length > 1 ? SUBJECT_SUGGESTIONS.filter(s => s.toLowerCase().includes(v.toLowerCase())).slice(0, 5) : []);
+    const allSuggestions = [...SUBJECT_SUGGESTIONS];
+    // If CV analysis suggested a subject, push it to top
+    if (cvAnalysis?.target_subject && !allSuggestions.includes(cvAnalysis.target_subject)) {
+      allSuggestions.unshift(cvAnalysis.target_subject);
+    }
+    setSuggestions(v.length > 1 ? allSuggestions.filter(s => s.toLowerCase().includes(v.toLowerCase())).slice(0, 6) : []);
   };
 
   // Loading stages
-  const STEPS = ['Parsing your profile...', 'Querying courses database...', 'Matching scholarships...', 'Checking visa requirements...', 'Calculating costs...', 'Preparing your plan...'];
+  const STEPS = ['Parsing your profile...', 'Expanding subject terms...', 'Querying courses database...', 'Matching scholarships...', 'Checking visa requirements...', 'Calculating costs...', 'Generating your personalized plan...'];
   useEffect(() => {
     if (!isAnalyzing || responseText) return;
     const t = setInterval(() => setLoadingStep(p => (p + 1) % STEPS.length), 2500);
@@ -730,7 +915,6 @@ export default function FindUni() {
           const err = await res.json();
           errorMessage = err.error || errorMessage;
         } catch (parseError) {
-          // If JSON parsing fails, use status text
           errorMessage = res.statusText || `Server error (${res.status})`;
           console.error('Failed to parse error response:', parseError);
         }
@@ -758,6 +942,11 @@ export default function FindUni() {
               console.log('Received metadata:', ev);
               setMetadata(ev);
             }
+            else if (ev.type === 'cv_extracted') {
+              console.log('Received CV extraction:', ev.data);
+              // Update analysis display during results
+              if (ev.data) setCvAnalysis(prev => ({ ...prev, ...ev.data }));
+            }
             else if (ev.type === 'courses') {
               console.log('Received courses:', ev.data?.length);
               setCourses(ev.data || []);
@@ -772,21 +961,21 @@ export default function FindUni() {
             }
             else if (ev.type === 'chunk') {
               setResponseText(p => p + ev.content);
-              // Update loading step based on response progress
               if (loadingStep < STEPS.length - 1) {
                 setLoadingStep(prev => Math.min(prev + 1, STEPS.length - 1));
               }
             }
             else if (ev.type === 'status') {
               console.log('Status:', ev.content);
-              // Update loading step based on status message
               const statusMessages = {
                 'analyzing': 0,
-                'querying': 1,
-                'matching': 2,
-                'checking': 3,
-                'crunching': 4,
-                'writing': 5,
+                'expanding': 1,
+                'querying': 2,
+                'matching': 3,
+                'checking': 4,
+                'crunching': 5,
+                'writing': 6,
+                'generating': 6,
               };
               const statusLower = (ev.content || '').toLowerCase();
               for (const [key, step] of Object.entries(statusMessages)) {
@@ -840,7 +1029,7 @@ export default function FindUni() {
               <span className="text-gray-400">university match.</span>
             </h1>
             <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto font-light leading-relaxed mb-12">
-              Access verified courses with CRICOS codes, real scholarships, and exact requirements from official sources.
+              Upload your CV — we'll read it, auto-fill your profile, and match you with verified courses and real scholarships from our database.
             </p>
             <div className="flex items-center justify-center gap-12 text-center">
               <div>
@@ -869,30 +1058,101 @@ export default function FindUni() {
 
             {/* CV Upload */}
             <div className="bg-white rounded-2xl border border-gray-100 p-8 md:p-12 mb-6">
-              <h2 className="text-2xl font-serif font-medium text-gray-900 mb-2">Upload Your CV</h2>
-              <p className="text-sm text-gray-400 mb-8">Optional but recommended. PDF only, max 5 MB, never stored.</p>
+              <div className="flex items-center gap-3 mb-2">
+                <h2 className="text-2xl font-serif font-medium text-gray-900">Upload Your CV</h2>
+                {isParsing && (
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[11px] font-semibold text-blue-700"
+                  >
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Reading your CV...
+                  </motion.span>
+                )}
+              </div>
+              <p className="text-sm text-gray-400 mb-8">
+                {cvAnalysis ? 'CV analyzed! We auto-filled your profile below. Review and adjust as needed.' : 'Upload your CV and we\'ll auto-fill your profile. PDF only, max 5 MB, never stored.'}
+              </p>
 
               {!cvFile ? (
                 <div
                   className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${isDragging ? 'border-blue-400 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300 bg-gray-50/50'}`}
                   onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
                   onDragLeave={() => setIsDragging(false)}
-                  onDrop={e => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f?.type === 'application/pdf') setCvFile(f); }}
+                  onDrop={e => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f?.type === 'application/pdf') handleCvUpload(f); }}
                   onClick={() => fileRef.current?.click()}
                 >
                   <FileText className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                   <p className="text-gray-500 mb-1">Drag & drop your CV here, or <span className="text-blue-600 font-medium">browse</span></p>
-                  <p className="text-xs text-gray-400">PDF • Max 5 MB</p>
-                  <input ref={fileRef} type="file" accept=".pdf" onChange={e => { if (e.target.files[0]) setCvFile(e.target.files[0]); }} className="hidden" />
+                  <p className="text-xs text-gray-400">PDF • Max 5 MB • We'll extract your details automatically</p>
+                  <input ref={fileRef} type="file" accept=".pdf" onChange={e => { if (e.target.files[0]) handleCvUpload(e.target.files[0]); }} className="hidden" />
                 </div>
               ) : (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-green-50 border border-green-100">
-                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{cvFile.name}</p>
-                    <p className="text-xs text-gray-400">{(cvFile.size / 1024).toFixed(0)} KB</p>
+                <div>
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-green-50 border border-green-100">
+                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{cvFile.name}</p>
+                      <p className="text-xs text-gray-400">{(cvFile.size / 1024).toFixed(0)} KB</p>
+                    </div>
+                    <button onClick={() => { setCvFile(null); setCvAnalysis(null); setAutoFilledFields(new Set()); }} className="p-1 hover:bg-green-100 rounded-lg transition-colors"><X className="w-4 h-4 text-gray-400" /></button>
                   </div>
-                  <button onClick={() => setCvFile(null)} className="p-1 hover:bg-green-100 rounded-lg transition-colors"><X className="w-4 h-4 text-gray-400" /></button>
+                  
+                  {/* CV Analysis Summary inline */}
+                  {cvAnalysis && !isParsing && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="mt-4"
+                    >
+                      <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-xl p-4 border border-emerald-200/50">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Sparkles className="w-4 h-4 text-emerald-600" />
+                          <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">CV Intelligence</span>
+                          <span className="text-[10px] text-emerald-600 font-medium ml-auto">{autoFilledFields.size} fields auto-filled ↓</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {cvAnalysis.education_summary && (
+                            <div className="bg-white/80 rounded-lg px-3 py-2">
+                              <p className="text-[10px] text-gray-400 font-bold uppercase">Education</p>
+                              <p className="text-xs text-gray-700">{cvAnalysis.education_summary}</p>
+                            </div>
+                          )}
+                          {cvAnalysis.target_subject && (
+                            <div className="bg-white/80 rounded-lg px-3 py-2">
+                              <p className="text-[10px] text-gray-400 font-bold uppercase">Recommended Subject</p>
+                              <p className="text-xs text-gray-700 font-semibold">{cvAnalysis.target_subject}</p>
+                            </div>
+                          )}
+                          {cvAnalysis.skills && (
+                            <div className="bg-white/80 rounded-lg px-3 py-2 col-span-2">
+                              <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Key Skills</p>
+                              <div className="flex flex-wrap gap-1">
+                                {(Array.isArray(cvAnalysis.skills) ? cvAnalysis.skills : []).slice(0, 6).map((s, i) => (
+                                  <span key={i} className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-medium">{s}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                  
+                  {/* Parsing shimmer */}
+                  {isParsing && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="mt-4 space-y-2"
+                    >
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="h-8 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 rounded-lg animate-pulse" style={{ animationDelay: `${i * 0.2}s` }} />
+                      ))}
+                      <p className="text-xs text-gray-400 text-center mt-2">Reading your CV with AI...</p>
+                    </motion.div>
+                  )}
                 </div>
               )}
             </div>
@@ -902,27 +1162,39 @@ export default function FindUni() {
               <h2 className="text-2xl font-serif font-medium text-gray-900 mb-8">Your Profile</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Nationality *</label>
-                  <select className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all appearance-none" value={profile.nationality} onChange={e => update('nationality', e.target.value)}>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    Nationality *
+                    {autoFilledFields.has('nationality') && <AutoFilledBadge />}
+                  </label>
+                  <select className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all appearance-none" value={profile.nationality} onChange={e => { update('nationality', e.target.value); setAutoFilledFields(prev => { const n = new Set(prev); n.delete('nationality'); return n; }); }}>
                     <option value="">Select nationality</option>
                     {NATIONALITIES.map(n => <option key={n} value={n.toLowerCase()}>{n}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Current Qualification</label>
-                  <select className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all appearance-none" value={profile.current_qualification} onChange={e => update('current_qualification', e.target.value)}>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    Current Qualification
+                    {autoFilledFields.has('current_qualification') && <AutoFilledBadge />}
+                  </label>
+                  <select className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all appearance-none" value={profile.current_qualification} onChange={e => { update('current_qualification', e.target.value); setAutoFilledFields(prev => { const n = new Set(prev); n.delete('current_qualification'); return n; }); }}>
                     <option value="">Select qualification</option>
                     {QUALIFICATIONS.map(q => <option key={q.value} value={q.value}>{q.label}</option>)}
                   </select>
                   {qualLabel && <p className="text-xs text-gray-400 mt-1">→ Applying for <span className="font-medium text-gray-600">{qualLabel.level}</span> programs</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">GPA (out of 4.0)</label>
-                  <input type="number" min="0" max="4" step="0.1" placeholder="e.g. 3.5" className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all" value={profile.gpa} onChange={e => update('gpa', e.target.value)} />
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    GPA (out of 4.0)
+                    {autoFilledFields.has('gpa') && <AutoFilledBadge />}
+                  </label>
+                  <input type="number" min="0" max="4" step="0.1" placeholder="e.g. 3.5" className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all" value={profile.gpa} onChange={e => { update('gpa', e.target.value); setAutoFilledFields(prev => { const n = new Set(prev); n.delete('gpa'); return n; }); }} />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">IELTS Overall</label>
-                  <input type="number" min="0" max="9" step="0.5" placeholder="e.g. 6.5 (leave blank if not taken)" className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all" value={profile.ielts_overall} onChange={e => update('ielts_overall', e.target.value)} />
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    IELTS Overall
+                    {autoFilledFields.has('ielts_overall') && <AutoFilledBadge />}
+                  </label>
+                  <input type="number" min="0" max="9" step="0.5" placeholder="e.g. 6.5 (leave blank if not taken)" className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all" value={profile.ielts_overall} onChange={e => { update('ielts_overall', e.target.value); setAutoFilledFields(prev => { const n = new Set(prev); n.delete('ielts_overall'); return n; }); }} />
                   <button onClick={() => setShowIeltsDetail(!showIeltsDetail)} className="text-xs text-blue-600 mt-1 hover:underline">{showIeltsDetail ? '− Hide' : '+ Add'} individual band scores</button>
                 </div>
               </div>
@@ -932,7 +1204,10 @@ export default function FindUni() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 p-4 bg-gray-50 rounded-xl">
                       {['reading', 'writing', 'speaking', 'listening'].map(s => (
                         <div key={s}>
-                          <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{s}</label>
+                          <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">
+                            {s}
+                            {autoFilledFields.has(`ielts_${s}`) && <AutoFilledBadge />}
+                          </label>
                           <input type="number" min="0" max="9" step="0.5" placeholder="0.0" className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 outline-none" value={profile[`ielts_${s}`]} onChange={e => update(`ielts_${s}`, e.target.value)} />
                         </div>
                       ))}
@@ -947,22 +1222,36 @@ export default function FindUni() {
               <h2 className="text-2xl font-serif font-medium text-gray-900 mb-8">Study Preferences</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
                 <div className="relative">
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Target Subject</label>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    Target Subject
+                    {autoFilledFields.has('target_subject') && <AutoFilledBadge />}
+                  </label>
                   <input type="text" placeholder="e.g. Computer Science, MBA..." className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all" value={profile.target_subject} onChange={e => onSubjectChange(e.target.value)} onBlur={() => setTimeout(() => setSuggestions([]), 200)} />
                   {suggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-20 bg-white border border-gray-200 rounded-xl mt-1 shadow-lg overflow-hidden">
-                      {suggestions.map(s => (
-                        <div key={s} className="px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 cursor-pointer transition-colors" onMouseDown={() => { update('target_subject', s); setSuggestions([]); }}>{s}</div>
+                      {suggestions.map((s, i) => (
+                        <div key={s} className={`px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 cursor-pointer transition-colors ${i === 0 && cvAnalysis?.target_subject === s ? 'bg-emerald-50 border-l-2 border-emerald-400' : ''}`} onMouseDown={() => { update('target_subject', s); setSuggestions([]); }}>
+                          {s}
+                          {i === 0 && cvAnalysis?.target_subject === s && (
+                            <span className="ml-2 text-[10px] text-emerald-600 font-semibold">Recommended from CV</span>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Career Goal</label>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    Career Goal
+                    {autoFilledFields.has('career_goal') && <AutoFilledBadge />}
+                  </label>
                   <input type="text" placeholder="e.g. Data Engineer at a tech company" className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all" value={profile.career_goal} onChange={e => update('career_goal', e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Work Experience</label>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    Work Experience
+                    {autoFilledFields.has('work_experience_years') && <AutoFilledBadge />}
+                  </label>
                   <select className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all appearance-none" value={profile.work_experience_years} onChange={e => update('work_experience_years', e.target.value)}>
                     <option value={0}>None / Fresh Graduate</option>
                     {[1,2,3,4,5,6,7,8,9,10].map(y => <option key={y} value={y}>{y} year{y > 1 ? 's' : ''}</option>)}
@@ -1013,7 +1302,7 @@ export default function FindUni() {
               </div>
             </div>
 
-            {/* States/Regions - Only show if countries with state data are selected */}
+            {/* States/Regions */}
             {profile.preferred_countries.some(c => COUNTRY_STATES[c]) && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
@@ -1086,7 +1375,9 @@ export default function FindUni() {
               disabled={!isValid}
               className={`w-full flex items-center justify-center gap-3 px-8 py-5 rounded-2xl text-base font-medium transition-all ${isValid ? 'bg-gray-900 text-white hover:bg-gray-800 cursor-pointer' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
             >
-              Find My Path<ArrowRight className="w-4 h-4" />
+              <Zap className="w-4 h-4" />
+              Find My Path
+              <ArrowRight className="w-4 h-4" />
             </motion.button>
             <p className="text-center text-xs text-gray-400 mt-6 mb-8">Your CV is processed in-memory and never stored. Analysis takes 10–20 seconds.</p>
           </motion.section>
@@ -1110,13 +1401,15 @@ export default function FindUni() {
               )}
             </div>
 
+            {/* CV Analysis Summary in results */}
+            {cvAnalysis && <CVAnalysisSummary analysis={cvAnalysis} />}
+
             {/* ── DATA CARDS: Courses ── */}
             {courses.length > 0 && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-12">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-2xl font-serif font-medium text-gray-900">Courses</h3>
                   
-                  {/* Location Filter */}
                   <div className="flex items-center gap-2">
                     <select 
                       className="text-xs bg-white border border-gray-200 px-3 py-2 rounded-lg text-gray-600 focus:border-gray-400 outline-none appearance-none cursor-pointer"
@@ -1145,7 +1438,7 @@ export default function FindUni() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="mb-12">
                 <div className="mb-6">
                   <h3 className="text-2xl font-serif font-medium text-gray-900 mb-1">Scholarships</h3>
-                  <p className="text-sm text-gray-400">Filtered for your nationality & subject</p>
+                  <p className="text-sm text-gray-400">Filtered for your nationality & subject • Ranked by match quality</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {scholarships.map((s, i) => <ScholarshipCard key={i} scholarship={s} index={i} />)}
@@ -1173,17 +1466,15 @@ export default function FindUni() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-12">
                 <div className="mb-6">
                   <h3 className="text-2xl font-serif font-medium text-gray-900 mb-1">Analysis</h3>
-                  <p className="text-sm text-gray-400">Personalized recommendations based on your profile</p>
+                  <p className="text-sm text-gray-400">Personalized recommendations based on your profile & CV</p>
                 </div>
 
                 <MarkdownResponse text={responseText} />
 
-                {/* Streaming cursor */}
                 {isAnalyzing && (
                   <motion.span animate={{ opacity: [1, 0] }} transition={{ duration: 0.7, repeat: Infinity }} className="inline-block w-1.5 h-5 bg-blue-600 ml-1 align-text-bottom rounded-sm mt-2" />
                 )}
 
-                {/* Done stats */}
                 {doneInfo && (
                   <div className="mt-8 space-y-6">
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 flex-wrap">
@@ -1239,7 +1530,7 @@ export default function FindUni() {
               </motion.div>
             )}
 
-            {/* Error - show even if there's partial content */}
+            {/* Error */}
             {error && (
               <div className="bg-white rounded-2xl border border-red-100 p-8 mb-6">
                 <div className="flex items-start gap-3 text-red-600 mb-4">
