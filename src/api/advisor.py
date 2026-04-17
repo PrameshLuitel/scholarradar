@@ -166,9 +166,13 @@ def _query_matching_courses(
     search_terms = expanded_terms or [target_subject] if target_subject else []
 
     for country in countries:
-        query = db.table("courses").select("*").eq("is_active", True).ilike("country", country.strip())
+        query = db.table("courses").select("*").eq("is_active", True).ilike("country", f"%{country.strip()}%")
         if inferred_level and inferred_level.lower() not in ['any', 'none', '']:
-            query = query.ilike("level", inferred_level)
+            lvl = inferred_level.lower()
+            if any(k in lvl for k in ('undergrad', 'high', 'bachelor', 'b.a', 'b.s')):
+                query = query.or_("level.ilike.%undergrad%,level.ilike.%bachelor%,level.ilike.%diploma%,level.ilike.%associate%")
+            elif any(k in lvl for k in ('postgrad', 'master', 'doctor', 'phd')):
+                query = query.or_("level.ilike.%postgrad%,level.ilike.%master%,level.ilike.%doctor%,level.ilike.%phd%,level.ilike.%grad%")
         rows = (query.execute()).data or []
 
         for c in rows:
@@ -357,9 +361,13 @@ def _query_matching_scholarships(
     today = date.today()
 
     for country in countries:
-        query = db.table("scholarships").select("*").eq("is_active", True).ilike("country", country.strip())
-        if inferred_level:
-            query = query.ilike("study_level", inferred_level)
+        query = db.table("scholarships").select("*").eq("is_active", True).ilike("country", f"%{country.strip()}%")
+        if inferred_level and inferred_level.lower() not in ['any', 'none', '']:
+            lvl = inferred_level.lower()
+            if any(k in lvl for k in ('undergrad', 'high', 'bachelor', 'b.a', 'b.s')):
+                query = query.or_("study_level.ilike.%undergrad%,study_level.ilike.%bachelor%,study_level.ilike.%diploma%,study_level.ilike.%all%,study_level.ilike.%any%")
+            elif any(k in lvl for k in ('postgrad', 'master', 'doctor', 'phd')):
+                query = query.or_("study_level.ilike.%postgrad%,study_level.ilike.%master%,study_level.ilike.%doctor%,study_level.ilike.%phd%,study_level.ilike.%all%,study_level.ilike.%any%")
         rows = (query.execute()).data or []
 
         for s in rows:
