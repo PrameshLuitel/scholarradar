@@ -77,10 +77,10 @@ function AutoFilledBadge({ fieldName }) {
     <motion.span
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-700 ml-2"
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[10px] font-semibold text-blue-700 ml-2"
     >
-      <Sparkles className="w-2.5 h-2.5" />
-      From CV
+      <FileText className="w-2.5 h-2.5" />
+      Extracted
     </motion.span>
   );
 }
@@ -474,15 +474,15 @@ function MarkdownResponse({ text }) {
   if (!text) return null;
 
   const sections = [];
-  let currentSection = { title: '', emoji: '', lines: [] };
+  let currentSection = { title: '', lines: [] };
 
   for (const line of text.split('\n')) {
-    const h3Match = line.match(/^###\s+([\p{Emoji}\u200d]+)\s*(.*)$/u);
+    const h3Match = line.match(/^###\s+(?:[\p{Emoji}\u200d]+\s*)?(.*)$/u);
     if (h3Match) {
       if (currentSection.title || currentSection.lines.length > 0) {
         sections.push({ ...currentSection });
       }
-      currentSection = { title: h3Match[2].trim(), emoji: h3Match[1], lines: [] };
+      currentSection = { title: h3Match[1].trim(), lines: [] };
     } else {
       currentSection.lines.push(line);
     }
@@ -529,9 +529,8 @@ function MarkdownResponse({ text }) {
             transition={{ delay: 0.1, duration: 0.3 }}
             className="bg-white rounded-2xl border border-gray-100 overflow-hidden"
           >
-            <div className={`px-5 py-3 border-b flex items-center gap-2.5 ${headerColor}`}>
-              <IconComp className="w-4 h-4 flex-shrink-0" />
-              <span className="text-sm font-semibold">{section.emoji} {section.title}</span>
+            <div className="px-5 py-3 border-b flex items-center gap-2.5 bg-gray-50 text-gray-800">
+              <span className="text-sm font-semibold tracking-wide uppercase">{section.title}</span>
             </div>
             <div className="px-5 py-4 text-sm text-gray-700 leading-relaxed">
               <RenderLines text={content} />
@@ -609,11 +608,11 @@ function CVAnalysisSummary({ analysis }) {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gradient-to-br from-emerald-50 to-blue-50 rounded-2xl border border-emerald-200/50 p-6 mb-6"
+      className="bg-gray-50 rounded-2xl border border-gray-100 p-6 mb-6"
     >
       <div className="flex items-center gap-2 mb-4">
-        <Brain className="w-5 h-5 text-emerald-600" />
-        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">CV Intelligence Summary</h3>
+        <Target className="w-5 h-5 text-gray-600" />
+        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Extracted Profile Overview</h3>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1119,9 +1118,9 @@ export default function FindUni() {
                     >
                       <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-xl p-4 border border-emerald-200/50">
                         <div className="flex items-center gap-2 mb-3">
-                          <Sparkles className="w-4 h-4 text-emerald-600" />
-                          <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">CV Intelligence</span>
-                          <span className="text-[10px] text-emerald-600 font-medium ml-auto">{autoFilledFields.size} fields auto-filled ↓</span>
+                          <FileText className="w-4 h-4 text-blue-600" />
+                          <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Extracted Data</span>
+                          <span className="text-[10px] text-blue-600 font-medium ml-auto">{autoFilledFields.size} fields auto-filled ↓</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           {cvAnalysis.education_summary && (
@@ -1161,9 +1160,9 @@ export default function FindUni() {
                       className="mt-4 space-y-2"
                     >
                       {[1, 2, 3].map(i => (
-                        <div key={i} className="h-8 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 rounded-lg animate-pulse" style={{ animationDelay: `${i * 0.2}s` }} />
+                        <div key={i} className="h-8 bg-gray-100 rounded-lg animate-pulse" style={{ animationDelay: `${i * 0.2}s` }} />
                       ))}
-                      <p className="text-xs text-gray-400 text-center mt-2">Reading your CV with AI...</p>
+                      <p className="text-xs text-gray-400 text-center mt-2">Processing document...</p>
                     </motion.div>
                   )}
                 </div>
@@ -1498,29 +1497,7 @@ export default function FindUni() {
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 border border-green-100 text-green-700 text-xs font-semibold"><Clock className="w-3 h-3" />{doneInfo.total_time_seconds}s Processing</span>
                     </motion.div>
 
-                    {/* Elite Claude Button */}
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.5 }}
-                      className="p-6 rounded-3xl bg-black text-white relative overflow-hidden group shadow-2xl"
-                    >
-                       <div className="absolute inset-0 opacity-10 bg-[url('/images/data_texture.png')] bg-cover"></div>
-                       <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-5">
-                          <div className="text-center md:text-left">
-                            <h4 className="text-lg font-serif font-medium mb-1">Need even deeper analysis?</h4>
-                            <p className="text-xs text-gray-400 max-w-sm">Connect Skolr directly to Claude for a high-fidelity counseling session with your full data profile.</p>
-                          </div>
-                          <a 
-                            href="https://claude.ai/settings/connectors" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="bg-white text-black px-6 py-3 rounded-full text-sm font-bold flex items-center gap-2 hover:bg-gray-100 transition-all hover:scale-105 active:scale-95"
-                          >
-                            <ExternalLink className="w-4 h-4" /> Use Claude Connector
-                          </a>
-                       </div>
-                    </motion.div>
+
 
                     {/* Legal Disclaimer & Disclosure */}
                     <div className="p-8 rounded-[2rem] bg-gray-50 border border-gray-100 text-center">
@@ -1538,10 +1515,9 @@ export default function FindUni() {
                 )}
 
                 {/* Disclaimer */}
-                <div className="mt-6 p-4 rounded-xl bg-amber-50/60 border border-amber-100 text-xs text-amber-800 leading-relaxed">
-                  <strong>⚠️ Important:</strong> Skolr is an AI data aggregator, not a migration agent or legal advisor.
-                  All data is for reference only. Always verify tuition fees, deadlines, and visa rules on official university
-                  or government websites. Source: <a href="https://skolr.xyz" className="underline">Skolr.xyz</a> / <a href="https://finduni.online" className="underline">FindUni.online</a>
+                <div className="mt-6 p-4 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-600 leading-relaxed">
+                  <strong>Important:</strong> All data is for reference only. Always verify tuition fees, deadlines, and requirements on official university
+                  or government websites. Source: <a href="https://skolr.xyz" className="underline hover:text-blue-600">Skolr.xyz</a>
                 </div>
               </motion.div>
             )}

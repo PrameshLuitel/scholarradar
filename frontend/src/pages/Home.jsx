@@ -28,7 +28,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-5 relative z-10 flex flex-col lg:flex-row items-center gap-10 lg:gap-16">
           <motion.div 
             initial="initial"
-            animate="animate"
+            whileInView="animate"
+            viewport={{ once: true, margin: "-100px" }}
             variants={stagger}
             className="flex-1 text-center lg:text-left"
           >
@@ -70,7 +71,8 @@ export default function Home() {
           
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
             className="flex-1 relative w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-none mt-4 lg:mt-0"
           >
@@ -94,12 +96,18 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/90 to-transparent"></div>
         </div>
 
-        <div className="max-w-5xl mx-auto px-5 relative z-10 text-center">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.8 }}
+          className="max-w-5xl mx-auto px-5 relative z-10 text-center"
+        >
           <h2 className="font-serif text-3xl sm:text-4xl md:text-6xl mb-6 md:mb-8 font-medium">No agency fees. No gatekeepers.</h2>
           <p className="text-lg md:text-xl lg:text-2xl text-gray-400 font-light max-w-3xl mx-auto leading-relaxed">
             International students lose thousands of dollars to recruitment agencies that hide the best options and push commissions. Skolr scrapes university and scholarship data daily from primary sources and serves it directly to your AI. Every link goes to the official page. Every result is unfiltered. Free forever.
           </p>
-        </div>
+        </motion.div>
       </section>
 
       <section id="features" className="py-16 md:py-32 px-5">
@@ -111,6 +119,10 @@ export default function Home() {
           
           <div className="grid md:grid-cols-3 gap-5 md:gap-8">
             <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.6 }}
               whileHover={{ y: -5 }}
               className="md:col-span-2 bg-white p-6 md:p-12 rounded-3xl md:rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden group"
             >
@@ -123,6 +135,10 @@ export default function Home() {
             </motion.div>
             
             <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.6, delay: 0.1 }}
               whileHover={{ y: -5 }}
               className="bg-gray-900 text-white p-6 md:p-12 rounded-3xl md:rounded-[2.5rem] shadow-xl relative overflow-hidden group"
             >
@@ -135,6 +151,10 @@ export default function Home() {
             </motion.div>
 
             <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.6, delay: 0.2 }}
               whileHover={{ y: -5 }}
               className="bg-white p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-gray-100 shadow-sm hover:border-gray-200 transition-colors"
             >
@@ -144,6 +164,10 @@ export default function Home() {
             </motion.div>
 
             <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.6, delay: 0.3 }}
               whileHover={{ y: -5 }}
               className="md:col-span-2 bg-gradient-to-br from-[#f0f4ff] to-white p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-blue-50 flex flex-col justify-center"
             >
