@@ -99,10 +99,12 @@ app = FastAPI(
 from src.api.analytics import app as analytics_app
 from src.api.dashboard import app as dashboard_app
 from src.api.advisor import app as advisor_app
+from src.api.cricos import app as cricos_app
 
 app.mount("/analytics", analytics_app)
 app.mount("/dashboard", dashboard_app)
 app.mount("/api/advisor", advisor_app)
+app.mount("/api/cricos", cricos_app)
 
 # 5. CORS Middleware
 app.add_middleware(
