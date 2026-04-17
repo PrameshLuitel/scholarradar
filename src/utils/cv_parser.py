@@ -167,67 +167,6 @@ def _extract_ielts_regex(cv_text: str) -> dict:
     return results
 
 
-def _extract_qualification_regex(cv_text: str) -> Optional[str]:
-    """Extract highest qualification level from CV text."""
-    cv_lower = cv_text.lower()
-    
-    # Check for PhD first (highest)
-    if any(k in cv_lower for k in ('ph.d', 'phd', 'doctor of philosophy', 'doctoral')):
-        return 'doctorate'
-    
-    # Then Masters
-    if any(k in cv_lower for k in ('master', 'msc', 'mba', 'meng', 'm.s.', 'm.a.', 'ma ', 'ms ')):
-        return 'masters'
-    
-    # Then Bachelors
-    if any(k in cv_lower for k in ('bachelor', 'bsc', 'b.sc', 'btech', 'b.tech', 'b.e.', 'be ', 'ba ', 'b.a.')):
-        return 'bachelors'
-    
-    # Then High School
-    if any(k in cv_lower for k in ('high school', 'secondary', '+2', '12th', 'a-level', 'a level', 'slc', 'ssc', 'hsc', 'intermediate')):
-        return 'high_school'
-    
-    return None
-
-
-def _extract_work_experience_regex(cv_text: str) -> Optional[int]:
-    """Extract approximate years of work experience from CV."""
-    # Look for explicit mentions
-    patterns = [
-        r'(\d+)\+?\s*years?\s*(?:of\s*)?(?:experience|work)',
-        r'(?:experience|work)[:\s]*(\d+)\+?\s*years?',
-        r'(\d+)\+?\s*years?\s*(?:in\s*the\s*)?(?:industry|field|sector)',
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, cv_text, re.IGNORECASE)
-        if match:
-            try:
-                years = int(match.group(1))
-                if 0 <= years <= 50:
-                    return years
-            except ValueError:
-                pass
-    
-    # Try counting date ranges in experience sections
-    date_ranges = re.findall(
-        r'(20\d{2}|19\d{2})\s*[-–—to]+\s*(20\d{2}|19\d{2}|present|current|now)',
-        cv_text, re.IGNORECASE
-    )
-    if date_ranges:
-        total_years = 0
-        for start, end in date_ranges:
-            try:
-                start_year = int(start)
-                end_year = 2026 if end.lower() in ('present', 'current', 'now') else int(end)
-                total_years += max(0, end_year - start_year)
-            except ValueError:
-                pass
-        if total_years > 0:
-            return min(total_years, 50)
-    
-    return None
-
-
 def _extract_nationality_regex(cv_text: str) -> Optional[str]:
     """Try to extract nationality from CV text."""
     # Common nationality patterns
@@ -346,14 +285,6 @@ async def extract_structured_profile(cv_text: str) -> dict:
     if ielts:
         profile.update(ielts)
     
-    qualification = _extract_qualification_regex(cv_text)
-    if qualification:
-        profile['current_qualification'] = qualification
-    
-    work_years = _extract_work_experience_regex(cv_text)
-    if work_years is not None:
-        profile['work_experience_years'] = work_years
-    
     log.info("cv_regex_extraction", fields_found=list(profile.keys()))
     
     # Phase 2: LLM extraction to fill gaps and get semantic fields
@@ -371,7 +302,7 @@ async def extract_structured_profile(cv_text: str) -> dict:
         if 'ielts_overall' not in profile:
             missing_fields.append('"ielts_overall": "IELTS overall score as string, or null"')
         if 'work_experience_years' not in profile:
-            missing_fields.append('"work_experience_years": "integer years of work experience, or 0"')
+            missing_fields.append('"work_experience_years": "accurate integer of full-time professional work experience years (DO NOT add education dates or overlapping dates together), or 0"')
         
         # Always ask for fields regex can't handle well
         always_fields = [
