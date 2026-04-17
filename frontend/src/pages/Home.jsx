@@ -29,7 +29,7 @@ export default function Home() {
           <motion.div 
             initial="initial"
             whileInView="animate"
-            viewport={{ once: true, margin: "-100px" }}
+            viewport={{ once: false, amount: 0.15, margin: "-100px" }}
             variants={stagger}
             className="flex-1 text-center lg:text-left"
           >
@@ -72,7 +72,7 @@ export default function Home() {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, margin: "-100px" }}
+            viewport={{ once: false, amount: 0.15, margin: "-100px" }}
             transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
             className="flex-1 relative w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-none mt-4 lg:mt-0"
           >
@@ -99,7 +99,7 @@ export default function Home() {
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-50px" }}
+          viewport={{ once: false, amount: 0.15, margin: "-50px" }}
           transition={{ duration: 0.8 }}
           className="max-w-5xl mx-auto px-5 relative z-10 text-center"
         >
@@ -121,7 +121,7 @@ export default function Home() {
             <motion.div 
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
+              viewport={{ once: false, amount: 0.15, margin: "-50px" }}
               transition={{ duration: 0.6 }}
               whileHover={{ y: -5 }}
               className="md:col-span-2 bg-white p-6 md:p-12 rounded-3xl md:rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden group"
@@ -137,7 +137,7 @@ export default function Home() {
             <motion.div 
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
+              viewport={{ once: false, amount: 0.15, margin: "-50px" }}
               transition={{ duration: 0.6, delay: 0.1 }}
               whileHover={{ y: -5 }}
               className="bg-gray-900 text-white p-6 md:p-12 rounded-3xl md:rounded-[2.5rem] shadow-xl relative overflow-hidden group"
@@ -153,7 +153,7 @@ export default function Home() {
             <motion.div 
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
+              viewport={{ once: false, amount: 0.15, margin: "-50px" }}
               transition={{ duration: 0.6, delay: 0.2 }}
               whileHover={{ y: -5 }}
               className="bg-white p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-gray-100 shadow-sm hover:border-gray-200 transition-colors"
@@ -166,7 +166,7 @@ export default function Home() {
             <motion.div 
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
+              viewport={{ once: false, amount: 0.15, margin: "-50px" }}
               transition={{ duration: 0.6, delay: 0.3 }}
               whileHover={{ y: -5 }}
               className="md:col-span-2 bg-gradient-to-br from-[#f0f4ff] to-white p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-blue-50 flex flex-col justify-center"

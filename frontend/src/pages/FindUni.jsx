@@ -121,7 +121,8 @@ function CourseCard({ course, index, allCourses, allScholarships }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: false, amount: 0.05 }}
       transition={{ delay: index * 0.05, duration: 0.3 }}
       className="bg-white rounded-2xl border border-gray-100 hover:shadow-md transition-shadow group relative overflow-hidden"
     >
@@ -396,7 +397,8 @@ function ScholarshipCard({ scholarship, index }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: false, amount: 0.05 }}
       transition={{ delay: index * 0.06, duration: 0.3 }}
       className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md transition-shadow group"
     >
@@ -525,7 +527,8 @@ function MarkdownResponse({ text }) {
           <motion.div
             key={idx}
             initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.1 }}
             transition={{ delay: 0.1, duration: 0.3 }}
             className="bg-white rounded-2xl border border-gray-100 overflow-hidden"
           >
@@ -607,7 +610,8 @@ function CVAnalysisSummary({ analysis }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: false, amount: 0.15 }}
       className="bg-gray-50 rounded-2xl border border-gray-100 p-6 mb-6"
     >
       <div className="flex items-center gap-2 mb-4">
