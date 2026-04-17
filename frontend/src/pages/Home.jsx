@@ -51,12 +51,12 @@ export default function Home() {
               variants={fadeInUp}
               className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 md:gap-5"
             >
-              <a href="#connect" className="w-full sm:w-auto relative group overflow-hidden px-8 py-4 text-base font-medium text-white bg-blue-600 rounded-full shadow-[0_8px_30px_rgb(37,99,235,0.4)] hover:shadow-[0_8px_30px_rgb(37,99,235,0.6)] transition-all hover:-translate-y-1 active:translate-y-0 border border-blue-400/30 ring-1 ring-inset ring-white/20 flex items-center justify-center gap-2">
-                <span className="relative z-10 flex items-center gap-2 drop-shadow-sm">Connect Now <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform"/></span>
+              <a href="/finduni" className="w-full sm:w-auto relative group overflow-hidden px-8 py-4 text-base font-medium text-white bg-blue-600 rounded-full shadow-[0_8px_30px_rgb(37,99,235,0.4)] hover:shadow-[0_8px_30px_rgb(37,99,235,0.6)] transition-all hover:-translate-y-1 active:translate-y-0 border border-blue-400/30 ring-1 ring-inset ring-white/20 flex items-center justify-center gap-2">
+                <span className="relative z-10 flex items-center gap-2 drop-shadow-sm">Use Skolr Now <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform"/></span>
                 <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent opacity-50 rounded-full pointer-events-none"></div>
               </a>
-              <a href="#features" className="text-base font-medium text-gray-500 hover:text-black transition-colors border-b border-transparent hover:border-black pb-1">
-                See what it can do
+              <a href="/#connect" className="text-base font-medium text-blue-600 hover:text-blue-700 transition-colors border-b-2 border-blue-600 hover:border-blue-700 pb-1 font-semibold">
+                Connect to Claude →
               </a>
             </motion.div>
             

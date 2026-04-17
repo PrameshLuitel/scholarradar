@@ -9,10 +9,6 @@ export default function Header() {
           Skolr<span className="text-blue-600 -ml-0.5 tracking-tighter">.</span>
         </Link>
         <nav className="hidden md:flex gap-10 text-sm font-medium tracking-wide text-gray-600">
-          <Link to="/finduni" className="hover:text-black transition-colors text-blue-600 relative font-semibold">
-            FindUni AI
-            <span className="absolute -top-3 -right-7 text-[9px] bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold px-1.5 py-0.5 rounded-full animate-pulse">NEW</span>
-          </Link>
           <a href="/#features" className="hover:text-black transition-colors">Platform</a>
           <a href="/#connect" className="hover:text-black transition-colors">Connect</a>
 

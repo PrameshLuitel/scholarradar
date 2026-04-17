@@ -92,6 +92,104 @@ async def _infer_subject_from_cv(cv_text: str) -> str:
         return ""
 
 
+async def _extract_cv_details(cv_text: str) -> dict:
+    """Extract qualification, GPA, and IELTS scores from CV using pattern matching + LLM."""
+    if not cv_text:
+        return {}
+    
+    details = {}
+    cv_lower = cv_text.lower()
+    
+    # 1. Extract GPA using pattern matching
+    import re
+    gpa_patterns = [
+        r'gpa[:\s]*([0-4]\.?\d{0,2})\s*(?:out of|/)?\s*4',
+        r'([0-4]\.?\d{0,2})\s*/\s*4',
+        r'cumulative\s*gpa[:\s]*([0-4]\.?\d{0,2})',
+        r'cgpa[:\s]*([0-4]\.?\d{0,2})',
+    ]
+    for pattern in gpa_patterns:
+        match = re.search(pattern, cv_text, re.IGNORECASE)
+        if match:
+            try:
+                gpa = float(match.group(1))
+                if 0.0 <= gpa <= 4.0:
+                    details['gpa'] = str(gpa)
+                    break
+            except ValueError:
+                pass
+    
+    # 2. Extract IELTS scores
+    ielts_patterns = [
+        r'ielts[:\s]*(overall[:\s]*)?([6-9]\.?\d{0,1})',
+        r'ielts\s*score[:\s]*([6-9]\.?\d{0,1})',
+        r'english\s*proficiency[:\s]*ielts[:\s]*([6-9]\.?\d{0,1})',
+    ]
+    for pattern in ielts_patterns:
+        match = re.search(pattern, cv_text, re.IGNORECASE)
+        if match:
+            try:
+                ielts = float(match.group(2) if len(match.groups()) > 1 else match.group(1))
+                if 0.0 <= ielts <= 9.0:
+                    details['ielts_overall'] = str(ielts)
+                    break
+            except (ValueError, IndexError):
+                pass
+    
+    # 3. Extract qualification/degree
+    qual_keywords = [
+        ('bachelor', 'bachelors'),
+        ('master', 'masters'),
+        ('phd', 'doctorate'),
+        ('high school', 'high_school'),
+        ('+2', 'high_school'),
+        ('12th', 'high_school'),
+        ('bsc', 'bachelors'),
+        ('ba ', 'bachelors'),
+        ('btech', 'bachelors'),
+        ('be ', 'bachelors'),
+        ('beng', 'bachelors'),
+        ('msc', 'masters'),
+        ('ma ', 'masters'),
+        ('mba', 'masters'),
+    ]
+    
+    for keyword, qual_type in qual_keywords:
+        if keyword in cv_lower:
+            details['current_qualification'] = qual_type
+            break
+    
+    # 4. Use LLM to fill in any missing details
+    if len(details) < 3:  # If we didn't find everything
+        try:
+            from src.utils.groq_cascade import non_streaming_groq
+            
+            system_prompt = """You are an expert CV parser. Extract these details from the CV as JSON:
+- gpa: GPA out of 4.0 (number only, or null if not found)
+- ielts_overall: IELTS score (number only, or null if not found)
+- current_qualification: One of: 'high_school', 'bachelors', 'masters', 'doctorate' (or null)
+
+Return ONLY valid JSON, no other text. Example: {"gpa": "3.5", "ielts_overall": "7.0", "current_qualification": "bachelors"}"""
+            
+            user_prompt = f"CV Content:\n{cv_text[:3000]}"
+            
+            res = await non_streaming_groq(system_prompt, user_prompt, max_tokens=100, temperature=0.0)
+            import json
+            llm_details = json.loads(res.get("content", "{}"))
+            
+            # Merge LLM results with pattern matching (pattern matching takes priority)
+            for key in ['gpa', 'ielts_overall', 'current_qualification']:
+                if key not in details and key in llm_details and llm_details[key]:
+                    details[key] = str(llm_details[key])
+        except Exception as e:
+            log.warning("cv_llm_extraction_failed", error=str(e))
+    
+    if details:
+        log.info("cv_details_extracted", details=details)
+    
+    return details
+
+
 # ── Database Queries ────────────────────────────────────────────────────────
 
 def _query_matching_courses(
@@ -100,20 +198,40 @@ def _query_matching_courses(
     inferred_level: Optional[str],
     ielts_score: Optional[float] = None,
     limit: int = 15,
+    preferred_states: Optional[list[str]] = None,
 ) -> list[dict]:
-    """Query courses matching the student's profile with rich location data."""
+    """Query courses matching the student's profile with rich location data.
+    
+    For Australia, prioritizes CRICOS data and groups courses by name+university
+    to show all available locations.
+    """
     db = _get_db()
     all_courses = []
+    course_groups = {}  # Group by (name, university) to show multiple locations
 
     for country in countries:
+        # For Australia, prioritize CRICOS data
         query = db.table("courses").select("*").eq("is_active", True).ilike("country", country.strip())
-        if inferred_level:
+        # Only filter by level if explicitly provided, otherwise get all courses
+        if inferred_level and inferred_level.lower() not in ['any', 'none', '']:
             query = query.ilike("level", inferred_level)
         rows = (query.execute()).data or []
 
         for c in rows:
+            # STATE FILTERING
+            state = c.get("state") or ""
+            if preferred_states:
+                state_match = False
+                for pref_state in preferred_states:
+                    if (state and pref_state.upper().startswith(state.upper())) or \
+                       (state and state.upper() in pref_state.upper()) or \
+                       (c.get("city") and c.get("city").upper() in pref_state.upper()):
+                        state_match = True
+                        break
+                if not state_match:
+                    continue
+                    
             course_name = (c.get("name") or "").lower()
-            # Filter out junk 6-month study abroad / non-degree programs unless specifically relevant
             junk_keywords = ["study abroad", "exchange", "exchange program", "non-award"]
             if any(k in course_name for k in junk_keywords) and not any(k in target_subject.lower() for k in junk_keywords):
                 continue
@@ -123,7 +241,6 @@ def _query_matching_courses(
                 _fuzzy(target_subject, c.get("subject") or ""),
                 _fuzzy(target_subject, c.get("subject_category") or ""),
             )
-            # If subject is provided, be strict. If not, we provide more top courses for AI to filter via CV.
             threshold = 0.35 if target_subject else 0.2
             if rel < threshold:
                 continue
@@ -135,66 +252,72 @@ def _query_matching_courses(
             fee = c.get("tuition_fee") or 0
             currency = c.get("currency", "AUD")
             source = (c.get("source") or "").upper()
-            
-            # Get state/region for location-based filtering
-            state = c.get("state") or ""
             city = c.get("city") or ""
             
-            # Basic match reasoning
-            match_reasons = []
-            if rel >= 0.8: match_reasons.append("Perfect subject match")
-            elif rel >= 0.5: match_reasons.append("Strong subject alignment")
-            
-            if ielts_met: match_reasons.append("Meets English requirements")
-            
-            # Add location info for Australia (CRICOS data has states)
-            location_info = ""
-            if country.lower() == "australia" and state:
-                location_info = f"{city}, {state}"
-            elif city:
-                location_info = city
-            
-            all_courses.append({
-                "name": c.get("name"),
-                "university": c.get("university"),
-                "country": c.get("country"),
+            # Create location entry
+            location_entry = {
                 "city": city,
                 "state": state,
-                "location": location_info,
-                "level": c.get("level"),
-                "tuition_fee": fee,
-                "tuition_display": f"{currency} {fee:,.0f}/yr" if fee else "Contact university",
-                "duration_months": c.get("duration_months"),
-                "duration_years": round(c.get("duration_months", 0) / 12, 1) if c.get("duration_months") else None,
-                "ielts_required": c.get("ielts_overall"),
-                "ielts_breakdown": {
-                    "overall": c.get("ielts_overall"),
-                    "reading": c.get("ielts_reading"),
-                    "writing": c.get("ielts_writing"),
-                    "speaking": c.get("ielts_speaking"),
-                    "listening": c.get("ielts_listening"),
-                },
-                "ielts_met": ielts_met,
-                "gpa_requirement": c.get("gpa_requirement"),
-                "entry_qualification": c.get("entry_qualification"),
-                "start_dates": c.get("start_dates", []),
-                "apply_url": c.get("apply_url"),
-                "source_url": c.get("source_url"),
+                "location": f"{city}, {state}" if (city and state) else (city or state),
                 "cricos_code": c.get("cricos_code"),
                 "provider_code": c.get("provider_code"),
-                "source": source,
-                "relevance": round(float(rel), 3),
-                "match_reason": " • ".join(match_reasons) if match_reasons else "Relevance match",
-            })
+                "start_dates": c.get("start_dates", []),
+            }
+            
+            # Group courses by name + university
+            course_key = f"{c.get('name')}|{c.get('university')}"
+            if course_key not in course_groups:
+                course_groups[course_key] = {
+                    "name": c.get("name"),
+                    "university": c.get("university"),
+                    "country": c.get("country"),
+                    "level": c.get("level"),
+                    "tuition_fee": fee,
+                    "tuition_display": f"{currency} {fee:,.0f}/yr" if fee else "Contact university",
+                    "currency": currency,
+                    "duration_months": c.get("duration_months"),
+                    "duration_years": round(c.get("duration_months", 0) / 12, 1) if c.get("duration_months") else None,
+                    "ielts_required": c.get("ielts_overall"),
+                    "ielts_breakdown": {
+                        "overall": c.get("ielts_overall"),
+                        "reading": c.get("ielts_reading"),
+                        "writing": c.get("ielts_writing"),
+                        "speaking": c.get("ielts_speaking"),
+                        "listening": c.get("ielts_listening"),
+                    },
+                    "ielts_met": ielts_met,
+                    "gpa_requirement": c.get("gpa_requirement"),
+                    "entry_qualification": c.get("entry_qualification"),
+                    "apply_url": c.get("apply_url"),
+                    "source_url": c.get("source_url"),
+                    "source": source,
+                    "relevance": round(float(rel), 3),
+                    "city": city,        # Flattened primary location
+                    "state": state,      # Flattened primary location
+                    "cricos_code": c.get("cricos_code"),   # Flattened primary location
+                    "provider_code": c.get("provider_code"), # Flattened primary location
+                    "locations": [location_entry],
+                    "is_cricos": source == "CRICOS",
+                }
+            else:
+                existing = course_groups[course_key]
+                # Only add if location is different
+                if not any(loc["city"] == city and loc["state"] == state for loc in existing["locations"]):
+                    existing["locations"].append(location_entry)
+                    if source == "CRICOS":
+                        existing["is_cricos"] = True
 
+    # Convert to list and apply rich sorting
+    all_courses = list(course_groups.values())
+    
     # Sort logic: 
-    # 1. Relevance
+    # 1. Relevance (desc)
     # 2. Source priority (CRICOS > IDP > Others) if Australia
     # 3. Cost (lower first)
     def sort_key(x):
         priority = 3
         if x["country"].lower() == "australia":
-            if "CRICOS" in x["source"]: priority = 1
+            if x.get("is_cricos"): priority = 1
             elif "IDP" in x["source"]: priority = 2
         return (-float(x["relevance"]), priority, x.get("tuition_fee") or 999999)
 
@@ -395,205 +518,55 @@ def _query_cost_of_living(countries: list[str]) -> list[dict]:
 
 # ── System Prompt ───────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are **ScholarRadar AI** — the world's most advanced study abroad advisor. You help students worldwide find their perfect university match based on their unique profile, goals, and circumstances.
+SYSTEM_PROMPT = """You are **ScholarRadar AI** — expert study abroad advisor.
 
-## YOUR MISSION
-Your goal is to provide genuinely life-changing guidance that helps students make informed decisions about their education abroad. Every recommendation must be personalized, actionable, and honest.
+## RULES
+1. **BE CONCISE** - Max 2-3 sentences per section
+2. **USE BULLETS** - No paragraphs, only lists
+3. **BE SPECIFIC** - Exact names, costs, URLs from database
+4. **NO FLUFF** - Skip generic advice
+5. **CRICOS PRIORITY** - For Australia, always show CRICOS code
+6. **MULTIPLE LOCATIONS** - Show ALL locations if course available in multiple cities
 
-## CORE PRINCIPLES
+## OUTPUT FORMAT
 
-### 1. DEEP PROFILE ANALYSIS
-- Read their CV carefully if provided - reference specific projects, skills, work experience, achievements
-- Understand their background, not just their grades
-- Identify their strengths and areas for improvement
-- Connect their past experiences to their future goals
-- Consider their financial reality - this is often their family's life savings
+### 🎯 Profile (3 bullets)
+- Academic: [qualification] + [GPA]
+- English: IELTS [score] → [meets/not meets]
+- Experience: [years] in [field]
 
-### 2. HONEST & TRANSPARENT
-- If their budget is too low, say it clearly and provide specific alternatives
-- If their IELTS/GPA is insufficient, tell them exactly what they need
-- Never sugarcoat challenges - students need truth to make good decisions
-- Provide realistic admission probabilities with reasoning
-- Be upfront about visa challenges for their nationality
+### 🎓 Top 3 Courses
+| Uni | Course | CRICOS | Locations | Fee/Year | IELTS |
+|-----|--------|--------|-----------|----------|-------|
+| [Name] | [Course] | [code] | [City1], [City2] | $[X] | [X] |
 
-### 3. HYPER-PERSONALIZED
-- Every recommendation must explain WHY it fits THEIR specific background
-- Reference their CV details, work experience, projects, skills
-- Connect their career goals to specific courses and universities
-- Provide tailored advice for their nationality's visa situation
-- Suggest scholarships they actually qualify for based on their profile
+- **Why:** [1 reason per course]
+- **Admission:** [High/Med/Low]
 
-### 4. ACTIONABLE & SPECIFIC
-- Every recommendation needs: exact name, cost, deadline, apply URL
-- Provide specific next steps, not generic advice
-- Include month-by-month timeline from NOW to their intake
-- Give exact test score targets if they need to improve
-- List concrete action items they can do THIS WEEK
+### 💰 Scholarships (top 3)
+- **[Name]** - $[amount] | Deadline: [date] | [URL]
 
-### 5. COUNTRY STRICT
-- ONLY recommend universities/courses/scholarships in their selected countries
-- Never suggest countries they didn't choose
-- Respect their preferences completely
+### 💵 Costs
+- **Total:** $[X] tuition + $[Y] living = $[Z] for [N] years
+- **Budget:** $[budget] → [OK/Short $X]
+- **Work:** $[X]/hr × [Y] hrs/wk = ~$[Z]/mo
 
-### 6. FINANCIAL REALITY CHECK
-- Calculate total costs (tuition + living) for full course duration
-- Compare directly to their stated budget
-- Show scholarship impact on affordability
-- Include part-time work opportunities and realistic earnings
-- Provide cheaper alternatives if budget is insufficient
+### 🛂 Visa
+- **Type:** [subclass]
+- **Proof:** $[amount]
+- **Work:** [X] hrs/wk
 
-## DATA USAGE RULES
-1. **Use tools extensively** - search_courses, search_scholarships, get_visa_requirements, get_universities, etc.
-2. **Never hallucinate** - every fact must come from tool results
-3. **Quote exact data** - use exact names, fees, URLs, CRICOS codes from database
-4. **If data missing** - say "Check official website" rather than guessing
-5. **Multiple tool calls** - call tools for each country they selected
+### 📅 This Week
+1. [action] → [URL]
+2. [action] → [URL]
+3. [action] → [URL]
 
-## LOCATION INTELLIGENCE (CRITICAL)
-You have access to DETAILED location data - USE IT:
+### ⚠️ Note
+- Verify on official websites
+- ScholarRadar = AI advisor, NOT migration agent
 
-### For Australia (CRICOS Data):
-- EVERY course has: city, state, CRICOS code, provider code
-- States: NSW, VIC, QLD, WA, SA, TAS, ACT, NT
-- Major cities: Sydney (NSW), Melbourne (VIC), Brisbane (QLD), Perth (WA), Adelaide (SA)
-- Regional areas: Often cheaper living, better PR pathways, additional visa points
-- ALWAYS mention the state - students need to know for visa, work, lifestyle decisions
-- CRICOS code is OFFICIAL - proves the course is government-approved for international students
-
-### For UK:
-- Cities: London, Manchester, Birmingham, Edinburgh, Glasgow, etc.
-- London is expensive but has more opportunities
-- Other cities are cheaper with good job markets
-
-### For Other Countries:
-- Use city data from database
-- Mention if it's a major hub for their field
-- Note cost of living differences between cities
-
-### Location Recommendations:
-- If budget is tight: Suggest regional/cheaper cities
-- If career-focused: Suggest industry hubs (e.g., Sydney for tech, Melbourne for finance)
-- If PR-focused: Mention regional areas with additional migration points
-- Always explain WHY a location is good/bad for their specific situation
-
-## RESPONSE STRUCTURE
-Use these exact section headers. Write 2-4 substantial paragraphs per section:
-
-### 🎯 Your Profile Analysis
-Analyze their complete profile in detail:
-- Academic background and performance
-- Work experience and skills (from CV if provided)
-- Strengths and competitive advantages
-- Areas needing attention (gaps, low scores, etc.)
-- How their background aligns with their goals
-- Specific insights that show you truly understand them
-
-### 🎓 Best-Match Universities & Courses
-Recommend 3-5 specific courses from database results. For EACH:
-- **Why it's perfect for them** (reference their CV/background specifically)
-- University name, course name, location (city AND state/region - be specific!)
-- Annual tuition fee AND total course cost (tuition × years)
-- Entry requirements vs their actual qualifications
-- IELTS requirement vs their score (show full breakdown: overall, reading, writing, speaking, listening)
-- Direct application URL from database
-- CRICOS code (if Australia) - this is official government registration
-- Admission probability: High/Medium/Low with honest reasoning
-- What makes this course stand out for their career
-- Location benefits: Is this city good for their field? Job opportunities? Cost of living?
-
-### 💰 Scholarships You Can Win
-Highlight 3-5 scholarships from results. For EACH:
-- Exact award value and what it covers
-- Why THEY specifically qualify (reference their profile)
-- Application deadline — mark ⚠️ URGENT if <30 days
-- Direct application link
-- Specific tips to strengthen their application
-- Realistic probability of winning it
-
-### 💵 Complete Financial Breakdown
-Be brutally honest with numbers:
-- Total cost for top 3 choices (tuition × years + living costs for full duration)
-- Their budget vs actual costs — is it realistic?
-- Scholarships that could reduce costs and by how much
-- Part-time work: hourly wage (from database), max hours/week, realistic monthly earnings
-- If budget insufficient: specific cheaper alternatives in their countries (different cities/states)
-- Simple cost comparison table showing: Tuition | Living | Total | Scholarship | Net Cost
-- Honest assessment: "Your budget of $X is/isn't sufficient because..."
-- Show weekly budget breakdown (rent, food, transport, utilities) for recommended cities
-- Include accommodation cost ranges (shared vs private) from university data
-
-### 🛂 Your Visa Pathway
-For their nationality to each destination:
-- Exact visa subclass/type and requirements (from database)
-- Financial proof required (specific amount in local currency - from database)
-- Processing time (min-max weeks from database) and when to apply
-- Work rights during study (hours/week from database) and after graduation
-- Post-study work visa duration
-- Required documents checklist (from database)
-- Honest visa approval likelihood for their nationality
-- Specific red flags to avoid in their application
-- Documents they need to start preparing NOW
-- Health insurance requirements (OSHC for Australia, etc.)
-
-### 📝 Test Score Strategy
-If they have IELTS/test scores:
-- Which recommended courses they qualify for now
-- What a 0.5 improvement would unlock (specific courses)
-- Whether retaking is worth time/money for their goals
-If no scores yet:
-- Target scores for their recommended courses
-- Preparation timeline and resources
-- Alternative tests accepted (TOEFL, PTE, etc.)
-
-### 📅 Your Month-by-Month Action Plan
-Create specific timeline from NOW to their target intake:
-- Each month: primary task + specific action items
-- Hard deadlines they cannot miss
-- What to prepare for following month
-- Buffer time for unexpected delays
-- Final checklist before departure
-
-### 🚀 Your Career Pathway After Graduation
-- Specific career outcomes for their field in destination country
-- Average graduate salary (cite real figures from data)
-- Job market demand level and growth trends
-- Post-study work visa duration and PR pathway
-- How this connects to their stated career goal
-- Companies/employers that hire graduates from their recommended courses
-- Skills they should build during study to maximize job prospects
-- Location-specific advice: Which cities/states have best job opportunities for their field?
-- Industry hubs: e.g., Sydney/Melbourne for tech, Perth for mining, etc.
-
-### ⚡ 5 Things to Do THIS WEEK
-Number 1-5, most urgent first. Be hyper-specific:
-- NOT "research universities" 
-- BUT "Apply to MSc Computer Science at University of Melbourne before March 15 at apply.unimelb.edu.au"
-- Include exact URLs, deadlines, amounts
-- Prioritize time-sensitive actions
-
-### ⚠️ Important Notes
-- ScholarRadar is an AI data aggregator, NOT a migration agent or legal advisor
-- All fees, deadlines, visa rules must be verified on official websites
-- Data sourced from ScholarRadar/FindUni databases — always double-check
-- Immigration rules change frequently — verify before making decisions
-- This guidance is personalized but not a guarantee of admission
-
-## TONE & STYLE
-- Professional but warm and encouraging
-- Direct and honest — students appreciate truth over fluff
-- Use specific numbers, names, URLs everywhere
-- Reference their personal details to show genuine understanding
-- Balance optimism with realistic expectations
-- Write like an expert counselor who genuinely cares about their success
-- Avoid generic statements — everything must be specific to THEM
-
-## CRITICAL REMINDERS
-- You are their trusted advisor — treat their future seriously
-- Every recommendation must be backed by actual tool data
-- Personalization is your superpower — use their CV details
-- Financial honesty protects them from bad decisions
-- Specific action items are more valuable than general advice
-- Your guidance could change their life — make it count
+## TONE: Direct, honest, specific
+## MAX: 3000 characters total
 """
 
 
@@ -725,6 +698,7 @@ async def analyze_profile(
         nationality = profile_data.get("nationality", "").strip()
         target_subject = profile_data.get("target_subject", "").strip()
         preferred_countries = profile_data.get("preferred_countries", [])
+        preferred_states = profile_data.get("preferred_states", [])  # NEW: State filtering
 
         if not nationality:
             return JSONResponse(status_code=400, content={"error": "Nationality is required"})
@@ -733,6 +707,8 @@ async def analyze_profile(
 
         if isinstance(preferred_countries, str):
             preferred_countries = [c.strip() for c in preferred_countries.split(",")]
+        if isinstance(preferred_states, str):
+            preferred_states = [s.strip() for s in preferred_states.split(",")]
 
         # Parse CV if provided
         cv_text = ""
@@ -755,10 +731,27 @@ async def analyze_profile(
                 pdf_bytes = await cv_file.read()
                 cv_text = extract_text_from_pdf(pdf_bytes)
                 
-                # If subject is missing, infer it from the CV
-                if not target_subject and cv_text:
-                    target_subject = await _infer_subject_from_cv(cv_text)
-                    profile_data["target_subject"] = target_subject
+                # Auto-detect profile details from CV
+                if cv_text:
+                    cv_details = await _extract_cv_details(cv_text)
+                    
+                    # Fill in missing profile fields from CV
+                    if cv_details.get('gpa') and not profile_data.get('gpa'):
+                        profile_data['gpa'] = cv_details['gpa']
+                        log.info("cv_auto_filled_gpa", gpa=cv_details['gpa'])
+                    
+                    if cv_details.get('ielts_overall') and not profile_data.get('ielts_overall'):
+                        profile_data['ielts_overall'] = cv_details['ielts_overall']
+                        log.info("cv_auto_filled_ielts", ielts=cv_details['ielts_overall'])
+                    
+                    if cv_details.get('current_qualification') and not profile_data.get('current_qualification'):
+                        profile_data['current_qualification'] = cv_details['current_qualification']
+                        log.info("cv_auto_filled_qualification", qual=cv_details['current_qualification'])
+                    
+                    # If subject is missing, infer it from the CV
+                    if not target_subject:
+                        target_subject = await _infer_subject_from_cv(cv_text)
+                        profile_data["target_subject"] = target_subject
             except ValueError as e:
                 return JSONResponse(status_code=400, content={"error": str(e)})
             except Exception as e:
@@ -798,6 +791,7 @@ async def analyze_profile(
             inferred_level=target_level,
             ielts_score=ielts_score,
             limit=15,
+            preferred_states=preferred_states,  # NEW: State filtering
         )
         
         # Get matching scholarships

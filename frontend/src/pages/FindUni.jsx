@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, FileText, GraduationCap, Globe, DollarSign,
-  Send, Sparkles, X, CheckCircle, AlertCircle, Loader2,
-  ArrowRight, BookOpen, Target, Brain, Clock, Award,
-  Info, Zap, ExternalLink, MapPin, Calendar, TrendingUp, ShieldCheck
+  Send, X, CheckCircle, AlertCircle, Loader2,
+  ArrowRight, BookOpen, Target, Clock, Award,
+  Info, ExternalLink, MapPin, Calendar, TrendingUp, ShieldCheck
 } from 'lucide-react';
 
 // ── Data ────────────────────────────────────────────────────────────────────
@@ -15,6 +15,34 @@ const COUNTRIES = [
   'Finland', 'Norway', 'France', 'Japan', 'South Korea',
   'Singapore', 'Malaysia', 'Switzerland',
 ];
+
+// State/Region data for countries that have it
+const COUNTRY_STATES = {
+  'australia': [
+    'NSW (Sydney)', 'VIC (Melbourne)', 'QLD (Brisbane)', 'WA (Perth)',
+    'SA (Adelaide)', 'TAS (Hobart)', 'ACT (Canberra)', 'NT (Darwin)'
+  ],
+  'united kingdom': [
+    'England', 'Scotland', 'Wales', 'Northern Ireland',
+    'London', 'Manchester', 'Birmingham', 'Edinburgh', 'Bristol'
+  ],
+  'canada': [
+    'Ontario (Toronto)', 'British Columbia (Vancouver)', 'Quebec (Montreal)',
+    'Alberta (Calgary)', 'Manitoba', 'Saskatchewan', 'Nova Scotia'
+  ],
+  'united states': [
+    'California', 'New York', 'Texas', 'Massachusetts (Boston)',
+    'Illinois (Chicago)', 'Washington (Seattle)', 'Florida'
+  ],
+  'germany': [
+    'Bavaria (Munich)', 'Berlin', 'North Rhine-Westphalia',
+    'Baden-Württemberg', 'Hamburg', 'Hesse (Frankfurt)'
+  ],
+  'new zealand': [
+    'Auckland', 'Wellington', 'Canterbury (Christchurch)',
+    'Otago (Dunedin)', 'Waikato (Hamilton)'
+  ],
+};
 
 const NATIONALITIES = [
   'Nepalese', 'Indian', 'Bangladeshi', 'Pakistani', 'Sri Lankan',
@@ -64,6 +92,15 @@ function CourseCard({ course, index, allCourses, allScholarships }) {
   const totalCost = course.tuition_fee && course.duration_months 
     ? course.tuition_fee * (course.duration_months / 12)
     : null;
+  
+  // Calculate potential scholarship savings
+  const topScholarship = relatedScholarships[0];
+  const scholarshipAmount = topScholarship?.amount ? 
+    (typeof topScholarship.amount === 'string' ? 
+      parseFloat(topScholarship.amount.replace(/[^0-9.]/g, '')) : 
+      topScholarship.amount) : 0;
+  const costAfterScholarship = totalCost && scholarshipAmount > 0 ? 
+    totalCost - scholarshipAmount : null;
 
   return (
     <motion.div
@@ -79,12 +116,11 @@ function CourseCard({ course, index, allCourses, allScholarships }) {
       >
         {/* Reasoning Badge */}
         <div className="flex items-center gap-1.5 mb-3">
-          <div className="px-2 py-0.5 rounded-full bg-purple-50 border border-purple-100 text-[10px] font-bold text-purple-600 uppercase tracking-tight flex items-center gap-1">
-            <Sparkles className="w-2.5 h-2.5" />
-            Elite Insight
+          <div className="px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[10px] font-bold text-blue-600 uppercase tracking-tight">
+            {course.is_cricos ? 'CRICOS Verified' : 'Verified'}
           </div>
           <span className="text-[11px] font-medium text-gray-500 italic">{course.match_reason}</span>
-          <span className="ml-auto text-[10px] text-blue-600 font-medium">
+          <span className="ml-auto text-[10px] text-gray-400 font-medium">
             {isExpanded ? 'Click to collapse ▲' : 'Click for details ▼'}
           </span>
         </div>
@@ -95,18 +131,23 @@ function CourseCard({ course, index, allCourses, allScholarships }) {
             <p className="text-xs text-gray-500 font-medium flex items-center gap-1">
               {course.university}
             </p>
-            <div className="flex items-center gap-2 mt-1">
-               <p className="text-[10px] text-gray-400 flex items-center gap-1 uppercase tracking-wider">
-                 <MapPin className="w-2.5 h-2.5" />
-                 {course.city}{course.state && `, ${course.state}`}
-               </p>
-               {showCodes && (
-                 <div className="flex items-center gap-1.5 ml-auto">
-                   {course.cricos_code && <span className="text-[9px] bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded border border-gray-100 font-mono">CRICOS: {course.cricos_code}</span>}
-                   {course.provider_code && <span className="text-[9px] bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded border border-gray-100 font-mono">PROV: {course.provider_code}</span>}
-                 </div>
-               )}
-            </div>
+            <div className="flex flex-col gap-0.5 mt-1">
+                <p className="text-[10px] text-gray-400 flex items-center gap-1 uppercase tracking-wider">
+                  <MapPin className="w-2.5 h-2.5" />
+                  {course.city}{course.state && `, ${course.state}`}
+                  {course.locations?.length > 1 && (
+                    <span className="text-blue-500 font-bold ml-1">
+                      + {course.locations.length - 1} more locations
+                    </span>
+                  )}
+                </p>
+                {showCodes && (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    {course.cricos_code && <span className="text-[9px] bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded border border-gray-100 font-mono">CRICOS: {course.cricos_code}</span>}
+                    {course.provider_code && <span className="text-[9px] bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded border border-gray-100 font-mono">PROV: {course.provider_code}</span>}
+                  </div>
+                )}
+              </div>
           </div>
           <div className="flex-shrink-0">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold ${
@@ -139,6 +180,12 @@ function CourseCard({ course, index, allCourses, allScholarships }) {
             <span className="text-sm font-bold text-gray-900">{course.tuition_display || 'Contact university'}</span>
             {totalCost && (
               <span className="block text-[10px] text-gray-500 mt-0.5">Total: {course.currency || 'AUD'} {totalCost.toLocaleString()}</span>
+            )}
+            {costAfterScholarship && costAfterScholarship > 0 && (
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <span className="text-[10px] text-green-600 font-medium">After {topScholarship.title}: </span>
+                <span className="text-sm font-bold text-green-700">{course.currency || 'AUD'} {costAfterScholarship.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+              </div>
             )}
           </div>
           {(course.apply_url || course.source_url) && (
@@ -387,7 +434,6 @@ const SECTION_CONFIG = {
   '📝': { color: 'blue', icon: BookOpen, label: 'Test Scores' },
   '📅': { color: 'teal', icon: Calendar, label: 'Action Plan' },
   '🚀': { color: 'rose', icon: TrendingUp, label: 'Career Pathway' },
-  '⚡': { color: 'orange', icon: Zap, label: 'Immediate Actions' },
   '⚠️': { color: 'gray', icon: Info, label: 'Disclaimers' },
 };
 
@@ -533,6 +579,7 @@ export default function FindUni() {
     target_subject: '',
     target_level: '',
     preferred_countries: [],
+    preferred_states: [],  // NEW: State/region filtering
     budget_usd: 30000,
     timeline_months: 12,
     career_goal: '',
@@ -565,7 +612,16 @@ export default function FindUni() {
   });
 
   const availableLocations = Array.from(new Set(
-    courses.map(c => c.state).filter(Boolean).concat(courses.map(c => c.city).filter(Boolean))
+    courses.flatMap(c => {
+      const locs = [c.state, c.city];
+      if (c.locations) {
+        c.locations.forEach(l => {
+          locs.push(l.state);
+          locs.push(l.city);
+        });
+      }
+      return locs;
+    }).filter(Boolean)
   )).sort();
 
   const update = (k, v) => setProfile(p => ({ ...p, [k]: v }));
@@ -575,7 +631,40 @@ export default function FindUni() {
       preferred_countries: p.preferred_countries.includes(c)
         ? p.preferred_countries.filter(x => x !== c)
         : [...p.preferred_countries, c],
+      // Clear states when country is deselected
+      preferred_states: p.preferred_countries.includes(c)
+        ? p.preferred_states
+        : [],
     }));
+  };
+
+  const toggleState = (state) => {
+    setProfile(p => ({
+      ...p,
+      preferred_states: p.preferred_states.includes(state)
+        ? p.preferred_states.filter(x => x !== state)
+        : [...p.preferred_states, state],
+    }));
+  };
+
+  const toggleAllStates = (country, states, allSelected) => {
+    setProfile(p => {
+      const currentStates = [...p.preferred_states];
+      if (allSelected) {
+        // Deselect all states for this country
+        return {
+          ...p,
+          preferred_states: currentStates.filter(s => !states.includes(s)),
+        };
+      } else {
+        // Select all states for this country
+        const newStates = [...new Set([...currentStates, ...states])];
+        return {
+          ...p,
+          preferred_states: newStates,
+        };
+      }
+    });
   };
 
   // Subject autocomplete
@@ -585,7 +674,7 @@ export default function FindUni() {
   };
 
   // Loading stages
-  const STEPS = ['Parsing your profile...', 'Querying courses database...', 'Matching scholarships...', 'Checking visa requirements...', 'Crunching costs...', 'AI is writing your plan...'];
+  const STEPS = ['Parsing your profile...', 'Querying courses database...', 'Matching scholarships...', 'Checking visa requirements...', 'Calculating costs...', 'Preparing your plan...'];
   useEffect(() => {
     if (!isAnalyzing || responseText) return;
     const t = setInterval(() => setLoadingStep(p => (p + 1) % STEPS.length), 2500);
@@ -626,17 +715,26 @@ export default function FindUni() {
         ielts_writing: profile.ielts_writing ? parseFloat(profile.ielts_writing) : null,
         ielts_speaking: profile.ielts_speaking ? parseFloat(profile.ielts_speaking) : null,
         ielts_listening: profile.ielts_listening ? parseFloat(profile.ielts_listening) : null,
-        budget_usd: parseInt(profile.budget_usd),
-        timeline_months: parseInt(profile.timeline_months),
-        work_experience_years: parseInt(profile.work_experience_years),
+        budget_usd: parseInt(profile.budget_usd) || 30000,
+        timeline_months: parseInt(profile.timeline_months) || 12,
+        work_experience_years: parseInt(profile.work_experience_years) || 0,
+        preferred_states: profile.preferred_states || [],
       };
       fd.append('profile', JSON.stringify(payload));
       if (cvFile) fd.append('cv_file', cvFile);
 
       const res = await fetch('/api/advisor/analyze', { method: 'POST', body: fd });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Analysis failed');
+        let errorMessage = 'Analysis failed';
+        try {
+          const err = await res.json();
+          errorMessage = err.error || errorMessage;
+        } catch (parseError) {
+          // If JSON parsing fails, use status text
+          errorMessage = res.statusText || `Server error (${res.status})`;
+          console.error('Failed to parse error response:', parseError);
+        }
+        throw new Error(errorMessage);
       }
 
       const reader = res.body.getReader();
@@ -733,30 +831,32 @@ export default function FindUni() {
   return (
     <>
       {/* Hero */}
-      <section className="relative pt-16 pb-8 md:pt-20 md:pb-12 lg:pt-28 lg:pb-16 overflow-hidden">
-        <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none"
-          style={{ backgroundImage: "url('/images/data_texture.png')", backgroundSize: 'cover' }}
-        />
-        <div className="max-w-3xl mx-auto px-5 relative z-10 text-center">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-xs font-semibold mb-6 tracking-wide">
-              <Sparkles className="w-3.5 h-3.5" />
-              AI-POWERED UNIVERSITY MATCHING
-            </div>
-            <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl font-medium tracking-normal text-gray-900 mb-5 leading-[1.1]">
-              Find your perfect<br />
-              <span className="italic text-gray-500">study abroad path.</span>
+      <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
+        <div className="max-w-5xl mx-auto px-6 text-center">
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
+            <h1 className="font-serif text-6xl sm:text-7xl md:text-8xl font-medium tracking-tight text-gray-900 mb-8 leading-[1.0]">
+              Find your perfect
+              <br />
+              <span className="text-gray-400">university match.</span>
             </h1>
-            <p className="text-lg md:text-xl text-gray-500 max-w-xl mx-auto font-light leading-relaxed mb-8">
-              Upload your CV, tell us your goals, and we'll search thousands of courses and
-              scholarships to build your personalized plan.
+            <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto font-light leading-relaxed mb-12">
+              Access verified courses with CRICOS codes, real scholarships, and exact requirements from official sources.
             </p>
-            <div className="flex items-center justify-center gap-8 text-center">
-              <div><span className="text-xl font-bold text-gray-900">5,000+</span><br /><span className="text-[11px] text-gray-400 uppercase tracking-wider">Courses</span></div>
-              <div className="w-px h-8 bg-gray-200" />
-              <div><span className="text-xl font-bold text-gray-900">30+</span><br /><span className="text-[11px] text-gray-400 uppercase tracking-wider">Countries</span></div>
-              <div className="w-px h-8 bg-gray-200" />
-              <div><span className="text-xl font-bold text-gray-900">~$0.003</span><br /><span className="text-[11px] text-gray-400 uppercase tracking-wider">Per Analysis</span></div>
+            <div className="flex items-center justify-center gap-12 text-center">
+              <div>
+                <div className="text-3xl font-light text-gray-900 mb-1">5,000+</div>
+                <div className="text-xs text-gray-400 uppercase tracking-widest">Courses</div>
+              </div>
+              <div className="w-px h-12 bg-gray-200" />
+              <div>
+                <div className="text-3xl font-light text-gray-900 mb-1">30+</div>
+                <div className="text-xs text-gray-400 uppercase tracking-widest">Countries</div>
+              </div>
+              <div className="w-px h-12 bg-gray-200" />
+              <div>
+                <div className="text-3xl font-light text-gray-900 mb-1">100%</div>
+                <div className="text-xs text-gray-400 uppercase tracking-widest">Free</div>
+              </div>
             </div>
           </motion.div>
         </div>
@@ -768,11 +868,9 @@ export default function FindUni() {
           <motion.section key="form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-3xl mx-auto px-5 pb-24">
 
             {/* CV Upload */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 md:p-10 mb-5">
-              <h2 className="text-xl font-serif font-medium text-gray-900 mb-1 flex items-center gap-2">
-                <Upload className="w-5 h-5 text-blue-600" />Upload Your CV
-              </h2>
-              <p className="text-sm text-gray-400 mb-5">Optional but recommended. PDF only, max 5 MB, never stored.</p>
+            <div className="bg-white rounded-2xl border border-gray-100 p-8 md:p-12 mb-6">
+              <h2 className="text-2xl font-serif font-medium text-gray-900 mb-2">Upload Your CV</h2>
+              <p className="text-sm text-gray-400 mb-8">Optional but recommended. PDF only, max 5 MB, never stored.</p>
 
               {!cvFile ? (
                 <div
@@ -800,10 +898,8 @@ export default function FindUni() {
             </div>
 
             {/* Profile */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 md:p-10 mb-5">
-              <h2 className="text-xl font-serif font-medium text-gray-900 mb-6 flex items-center gap-2">
-                <GraduationCap className="w-5 h-5 text-blue-600" />Your Profile
-              </h2>
+            <div className="bg-white rounded-2xl border border-gray-100 p-8 md:p-12 mb-6">
+              <h2 className="text-2xl font-serif font-medium text-gray-900 mb-8">Your Profile</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Nationality *</label>
@@ -847,10 +943,8 @@ export default function FindUni() {
             </div>
 
             {/* Study Preferences */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 md:p-10 mb-5">
-              <h2 className="text-xl font-serif font-medium text-gray-900 mb-6 flex items-center gap-2">
-                <Target className="w-5 h-5 text-blue-600" />Study Preferences
-              </h2>
+            <div className="bg-white rounded-2xl border border-gray-100 p-8 md:p-12 mb-6">
+              <h2 className="text-2xl font-serif font-medium text-gray-900 mb-8">Study Preferences</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
                 <div className="relative">
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Target Subject</label>
@@ -902,11 +996,9 @@ export default function FindUni() {
             </div>
 
             {/* Countries */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 md:p-10 mb-5">
-              <h2 className="text-xl font-serif font-medium text-gray-900 mb-2 flex items-center gap-2">
-                <Globe className="w-5 h-5 text-blue-600" />Preferred Countries *
-              </h2>
-              <p className="text-sm text-gray-400 mb-5">This directly filters which courses and scholarships we search.</p>
+            <div className="bg-white rounded-2xl border border-gray-100 p-8 md:p-12 mb-6">
+              <h2 className="text-2xl font-serif font-medium text-gray-900 mb-2">Preferred Countries</h2>
+              <p className="text-sm text-gray-400 mb-8">This directly filters which courses and scholarships we search.</p>
               <div className="flex flex-wrap gap-2">
                 {COUNTRIES.map(c => {
                   const sel = profile.preferred_countries.includes(c.toLowerCase());
@@ -921,12 +1013,62 @@ export default function FindUni() {
               </div>
             </div>
 
+            {/* States/Regions - Only show if countries with state data are selected */}
+            {profile.preferred_countries.some(c => COUNTRY_STATES[c]) && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="bg-white rounded-2xl border border-gray-100 p-8 md:p-12 mb-6"
+              >
+                <h2 className="text-2xl font-serif font-medium text-gray-900 mb-2">Preferred States/Regions</h2>
+                <p className="text-sm text-gray-400 mb-8">Narrow down to specific states or regions (optional). Leave empty to search all.</p>
+                
+                {profile.preferred_countries.map(country => {
+                  const states = COUNTRY_STATES[country];
+                  if (!states) return null;
+                  
+                  const countryName = COUNTRIES.find(c => c.toLowerCase() === country) || country;
+                  const allSelected = states.every(s => profile.preferred_states.includes(s));
+                  
+                  return (
+                    <div key={country} className="mb-6 last:mb-0">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold text-gray-700">{countryName}</h3>
+                        <button
+                          onClick={() => toggleAllStates(country, states, allSelected)}
+                          className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          {allSelected ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-xl">
+                        {states.map(state => {
+                          const sel = profile.preferred_states.includes(state);
+                          return (
+                            <button
+                              key={state}
+                              onClick={() => toggleState(state)}
+                              className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
+                                sel
+                                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                  : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                              }`}
+                            >
+                              {state}{sel && <CheckCircle className="w-3 h-3 inline ml-1 -mt-0.5" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </motion.div>
+            )}
+
             {/* Extra */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 md:p-10 mb-8">
-              <h2 className="text-xl font-serif font-medium text-gray-900 mb-2 flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-blue-600" />Anything Else?
-              </h2>
-              <p className="text-sm text-gray-400 mb-4">Specific universities, financial constraints, visa history, research interests...</p>
+            <div className="bg-white rounded-2xl border border-gray-100 p-8 md:p-12 mb-8">
+              <h2 className="text-2xl font-serif font-medium text-gray-900 mb-2">Anything Else?</h2>
+              <p className="text-sm text-gray-400 mb-8">Specific universities, financial constraints, visa history, research interests...</p>
               <textarea className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-y" rows={3} placeholder="Tell us anything that might help..." value={profile.extra_info} onChange={e => update('extra_info', e.target.value)} />
             </div>
 
@@ -938,63 +1080,50 @@ export default function FindUni() {
 
             {/* Submit */}
             <motion.button
-              whileHover={isValid ? { y: -2, boxShadow: '0 12px 40px rgba(37,99,235,0.35)' } : {}}
-              whileTap={isValid ? { scale: 0.99 } : {}}
+              whileHover={isValid ? { y: -2 } : {}}
+              whileTap={isValid ? { scale: 0.98 } : {}}
               onClick={handleSubmit}
               disabled={!isValid}
-              className={`w-full flex items-center justify-center gap-3 px-8 py-4 rounded-full text-lg font-semibold text-white transition-all ${isValid ? 'bg-blue-600 shadow-[0_8px_30px_rgba(37,99,235,0.35)] hover:bg-blue-700 cursor-pointer' : 'bg-gray-300 cursor-not-allowed'}`}
+              className={`w-full flex items-center justify-center gap-3 px-8 py-5 rounded-2xl text-base font-medium transition-all ${isValid ? 'bg-gray-900 text-white hover:bg-gray-800 cursor-pointer' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
             >
-              <Sparkles className="w-5 h-5" />Find My Path<ArrowRight className="w-5 h-5" />
+              Find My Path<ArrowRight className="w-4 h-4" />
             </motion.button>
-            <p className="text-center text-[11px] text-gray-400 mt-4 mb-8">🔒 Your CV is processed in-memory and never stored. Analysis takes 10–20 seconds.</p>
+            <p className="text-center text-xs text-gray-400 mt-6 mb-8">Your CV is processed in-memory and never stored. Analysis takes 10–20 seconds.</p>
           </motion.section>
 
         ) : (
           /* ═══════════════ RESULTS ═══════════════ */
           <motion.section key="results" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto px-5 pb-24">
 
-            {/* Result header badges */}
-            <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
-              <div className="flex items-center gap-2 flex-wrap">
-                {modelInfo && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 border border-purple-100 text-purple-700 text-xs font-semibold">
-                    <Brain className="w-3 h-3" />{modelInfo.display_name}
-                  </span>
-                )}
-                {metadata && (
-                  <>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs font-semibold">
-                      <GraduationCap className="w-3 h-3" />{metadata.courses_found} courses found
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-100 text-amber-700 text-xs font-semibold">
-                      <Award className="w-3 h-3" />{metadata.scholarships_found} scholarships found
-                    </span>
-                  </>
+            {/* Result header */}
+            <div className="mb-12">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-3xl font-serif font-medium text-gray-900">Your Results</h2>
+                {!isAnalyzing && (
+                  <button onClick={reset} className="text-sm text-gray-500 hover:text-gray-900 font-medium transition-colors">← New analysis</button>
                 )}
               </div>
-              {!isAnalyzing && (
-                <button onClick={reset} className="text-sm text-gray-500 hover:text-gray-900 font-medium transition-colors">← New analysis</button>
+              {metadata && (
+                <p className="text-sm text-gray-400">
+                  {metadata.courses_found} courses • {metadata.scholarships_found} scholarships
+                </p>
               )}
             </div>
 
             {/* ── DATA CARDS: Courses ── */}
             {courses.length > 0 && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-10">
-                <div className="flex items-center justify-between flex-wrap gap-4 mb-5 pb-4 border-b border-gray-100">
-                  <div className="flex items-center gap-2">
-                    <GraduationCap className="w-5 h-5 text-blue-600" />
-                    <h3 className="text-lg font-serif font-medium text-gray-900">Matching Highly-Rated Courses</h3>
-                  </div>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-12">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-2xl font-serif font-medium text-gray-900">Courses</h3>
                   
-                  {/* Location Filter Filter */}
+                  {/* Location Filter */}
                   <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-gray-400" />
                     <select 
-                      className="text-xs bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-lg text-gray-600 focus:border-blue-300 outline-none appearance-none cursor-pointer"
+                      className="text-xs bg-white border border-gray-200 px-3 py-2 rounded-lg text-gray-600 focus:border-gray-400 outline-none appearance-none cursor-pointer"
                       value={locationFilter}
                       onChange={e => setLocationFilter(e.target.value)}
                     >
-                      <option value="">All States & Cities</option>
+                      <option value="">All Locations</option>
                       {availableLocations.map(loc => <option key={loc} value={loc}>{loc}</option>)}
                     </select>
                   </div>
@@ -1013,11 +1142,10 @@ export default function FindUni() {
 
             {/* ── DATA CARDS: Scholarships ── */}
             {scholarships.length > 0 && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <Award className="w-5 h-5 text-amber-600" />
-                  <h3 className="text-lg font-serif font-medium text-gray-900">Matching Scholarships</h3>
-                  <span className="text-xs text-gray-400 ml-auto">filtered for your nationality & subject</span>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="mb-12">
+                <div className="mb-6">
+                  <h3 className="text-2xl font-serif font-medium text-gray-900 mb-1">Scholarships</h3>
+                  <p className="text-sm text-gray-400">Filtered for your nationality & subject</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {scholarships.map((s, i) => <ScholarshipCard key={i} scholarship={s} index={i} />)}
@@ -1027,7 +1155,7 @@ export default function FindUni() {
 
             {/* ── LOADING ── */}
             {isAnalyzing && !responseText && (
-              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-12 text-center mb-6">
+              <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center mb-6">
                 <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }} className="inline-block mb-6">
                   <Loader2 className="w-10 h-10 text-blue-600" />
                 </motion.div>
@@ -1040,12 +1168,12 @@ export default function FindUni() {
               </div>
             )}
 
-            {/* ── AI ANALYSIS ── */}
+            {/* ── ANALYSIS ── */}
             {responseText && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <Brain className="w-5 h-5 text-purple-600" />
-                  <h3 className="text-lg font-serif font-medium text-gray-900">AI Analysis & Recommendations</h3>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-12">
+                <div className="mb-6">
+                  <h3 className="text-2xl font-serif font-medium text-gray-900 mb-1">Analysis</h3>
+                  <p className="text-sm text-gray-400">Personalized recommendations based on your profile</p>
                 </div>
 
                 <MarkdownResponse text={responseText} />
@@ -1059,7 +1187,7 @@ export default function FindUni() {
                 {doneInfo && (
                   <div className="mt-8 space-y-6">
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 flex-wrap">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 border border-purple-100 text-purple-600 text-xs font-semibold"><Brain className="w-3 h-3" />{doneInfo.display_name} Analysis</span>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold"><ShieldCheck className="w-3 h-3" />Analysis Complete</span>
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 border border-green-100 text-green-700 text-xs font-semibold"><Clock className="w-3 h-3" />{doneInfo.total_time_seconds}s Processing</span>
                     </motion.div>
 
@@ -1082,7 +1210,7 @@ export default function FindUni() {
                             rel="noopener noreferrer"
                             className="bg-white text-black px-6 py-3 rounded-full text-sm font-bold flex items-center gap-2 hover:bg-gray-100 transition-all hover:scale-105 active:scale-95"
                           >
-                            <Zap className="w-4 h-4" /> Use Claude Connector
+                            <ExternalLink className="w-4 h-4" /> Use Claude Connector
                           </a>
                        </div>
                     </motion.div>
@@ -1113,7 +1241,7 @@ export default function FindUni() {
 
             {/* Error - show even if there's partial content */}
             {error && (
-              <div className="bg-white rounded-3xl border border-red-100 shadow-sm p-8 mb-6">
+              <div className="bg-white rounded-2xl border border-red-100 p-8 mb-6">
                 <div className="flex items-start gap-3 text-red-600 mb-4">
                   <AlertCircle className="w-6 h-6 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">

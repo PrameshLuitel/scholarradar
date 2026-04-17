@@ -28,15 +28,15 @@ log = structlog.get_logger("utils.groq_cascade")
 
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# Cascade order — first model that succeeds wins
-# We prioritize TPM (Tokens Per Minute) room so large CVs don't crash
+# Cascade order — RELIABLE models first, groq/compound as fallback
+# groq/compound is FREE but UNRELIABLE (sometimes returns errors)
 MODELS = [
-    "groq/compound",                           # 70K TPM — best for deep context
-    "meta-llama/llama-4-scout-17b-16e-instruct", # 30K TPM — extremely fast/roomy
-    "llama-3.3-70b-versatile",                 # 12K TPM — balanced fallback
+    "meta-llama/llama-4-scout-17b-16e-instruct", # 30K TPM — RELIABLE, fast, primary
+    "llama-3.3-70b-versatile",                 # 12K TPM — quality fallback
+    "groq/compound",                           # 70K TPM — FREE but UNRELIABLE, use as fallback
     "openai/gpt-oss-120b",                     # 8K TPM  — reasoning fallback
     "openai/gpt-oss-20b",                      # 8K TPM  — secondary reasoning
-    "qwen/qwen3-32b",                          # 6K TPM  — alternative fallback
+    "qwen/qwen3-32b",                          # 6K TPM  — last resort
 ]
 
 # Token pricing per 1M tokens (for cost tracking)
@@ -110,11 +110,8 @@ async def stream_groq_response(
                 
                 # Special Compound AI native tool activation
                 if model == "groq/compound":
-                    payload["compound_custom"] = {
-                        "tools": {
-                            "enabled_tools": ["web_search", "code_interpreter", "visit_website"]
-                        }
-                    }
+                    # REMOVED: compound_custom tools causing empty responses
+                    pass
 
                 response = await client.post(
                     GROQ_API_URL,
@@ -162,6 +159,11 @@ async def stream_groq_response(
 
                     try:
                         chunk = json.loads(data_str)
+                        
+                        # DEBUG: Log first chunk to see structure
+                        if not total_content:
+                            log.debug("groq_first_chunk", chunk_keys=list(chunk.keys()), choices=chunk.get("choices"))
+                        
                         choices = chunk.get("choices", [{}])
                         if not choices:
                             continue
@@ -172,11 +174,13 @@ async def stream_groq_response(
                         if "tool_calls" in delta:
                             yield {"type": "tool_call", "tool_calls": delta["tool_calls"]}
                         
-                        content = delta.get("content", "")
+                        # groq/compound uses 'reasoning' field instead of 'content'
+                        content = delta.get("content", "") or delta.get("reasoning", "")
 
                         # Check for usage in the final chunk
                         if chunk.get("usage"):
                             usage_data = chunk["usage"]
+                            log.debug("groq_usage_data", usage=usage_data)
 
                         if content:
                             total_content += content
