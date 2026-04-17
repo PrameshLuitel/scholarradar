@@ -4,9 +4,9 @@ import { motion } from 'framer-motion';
 
 export default function Home() {
   const fadeInUp = {
-    initial: { opacity: 0, y: 20 },
+    initial: { opacity: 0, y: 15 },
     animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.6, ease: "easeOut" }
+    transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] }
   };
 
   const stagger = {
@@ -70,10 +70,10 @@ export default function Home() {
           </motion.div>
           
           <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 0, scale: 0.98 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: false, amount: 0.15, margin: "-100px" }}
-            transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+            transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
             className="flex-1 relative w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-none mt-4 lg:mt-0"
           >
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-blue-400/10 blur-[120px] rounded-full pointer-events-none"></div>
@@ -97,10 +97,10 @@ export default function Home() {
         </div>
 
         <motion.div 
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 15 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: false, amount: 0.15, margin: "-50px" }}
-          transition={{ duration: 0.8 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
           className="max-w-5xl mx-auto px-5 relative z-10 text-center"
         >
           <h2 className="font-serif text-3xl sm:text-4xl md:text-6xl mb-6 md:mb-8 font-medium">No agency fees. No gatekeepers.</h2>
@@ -119,10 +119,10 @@ export default function Home() {
           
           <div className="grid md:grid-cols-3 gap-5 md:gap-8">
             <motion.div 
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 15 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.15, margin: "-50px" }}
-              transition={{ duration: 0.6 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
               whileHover={{ y: -5 }}
               className="md:col-span-2 bg-white p-6 md:p-12 rounded-3xl md:rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden group"
             >
@@ -135,10 +135,10 @@ export default function Home() {
             </motion.div>
             
             <motion.div 
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 15 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.15, margin: "-50px" }}
-              transition={{ duration: 0.6, delay: 0.1 }}
+              transition={{ duration: 0.4, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
               whileHover={{ y: -5 }}
               className="bg-gray-900 text-white p-6 md:p-12 rounded-3xl md:rounded-[2.5rem] shadow-xl relative overflow-hidden group"
             >
@@ -151,10 +151,10 @@ export default function Home() {
             </motion.div>
 
             <motion.div 
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 15 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.15, margin: "-50px" }}
-              transition={{ duration: 0.6, delay: 0.2 }}
+              transition={{ duration: 0.4, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
               whileHover={{ y: -5 }}
               className="bg-white p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-gray-100 shadow-sm hover:border-gray-200 transition-colors"
             >
@@ -164,10 +164,10 @@ export default function Home() {
             </motion.div>
 
             <motion.div 
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 15 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.15, margin: "-50px" }}
-              transition={{ duration: 0.6, delay: 0.3 }}
+              transition={{ duration: 0.4, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
               whileHover={{ y: -5 }}
               className="md:col-span-2 bg-gradient-to-br from-[#f0f4ff] to-white p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-blue-50 flex flex-col justify-center"
             >

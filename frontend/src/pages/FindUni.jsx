@@ -120,10 +120,10 @@ function CourseCard({ course, index, allCourses, allScholarships }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 6 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: false, amount: 0.05 }}
-      transition={{ delay: index * 0.05, duration: 0.3 }}
+      transition={{ delay: index * 0.03, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="bg-white rounded-2xl border border-gray-100 hover:shadow-md transition-shadow group relative overflow-hidden"
     >
       <div 
@@ -396,10 +396,10 @@ function ScholarshipCard({ scholarship, index }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 6 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: false, amount: 0.05 }}
-      transition={{ delay: index * 0.06, duration: 0.3 }}
+      transition={{ delay: index * 0.03, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md transition-shadow group"
     >
       <div className="flex items-start justify-between gap-3 mb-2">
@@ -526,10 +526,10 @@ function MarkdownResponse({ text }) {
         return (
           <motion.div
             key={idx}
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 4 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: false, amount: 0.1 }}
-            transition={{ delay: 0.1, duration: 0.3 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
             className="bg-white rounded-2xl border border-gray-100 overflow-hidden"
           >
             <div className="px-5 py-3 border-b flex items-center gap-2.5 bg-gray-50 text-gray-800">
@@ -609,9 +609,10 @@ function CVAnalysisSummary({ analysis }) {
   
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 5 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: false, amount: 0.15 }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="bg-gray-50 rounded-2xl border border-gray-100 p-6 mb-6"
     >
       <div className="flex items-center gap-2 mb-4">
