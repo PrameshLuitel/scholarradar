@@ -623,10 +623,12 @@ function CVAnalysisSummary({ analysis }) {
             <p className="text-xs text-gray-700">{analysis.education_summary}</p>
           </div>
         )}
-        {analysis.target_subject && (
+        {analysis.target_subjects && (
           <div className="bg-white/70 rounded-xl p-3 border border-white">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Recommended Subject</p>
-            <p className="text-xs text-gray-700 font-semibold">{analysis.target_subject}</p>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Recommended Subjects</p>
+            <p className="text-xs text-gray-700 font-semibold truncate">
+              {Array.isArray(analysis.target_subjects) ? analysis.target_subjects.join(', ') : analysis.target_subjects}
+            </p>
           </div>
         )}
         {analysis.career_goal && (
@@ -815,7 +817,6 @@ export default function FindUni() {
           ielts_writing: 'ielts_writing',
           ielts_speaking: 'ielts_speaking',
           ielts_listening: 'ielts_listening',
-          target_subject: 'target_subject',
           career_goal: 'career_goal',
           work_experience_years: 'work_experience_years',
         };
@@ -827,6 +828,13 @@ export default function FindUni() {
               updated[formKey] = String(fields[cvKey]);
               newAutoFilled.add(formKey);
             }
+          }
+          if (fields.target_subjects && Array.isArray(fields.target_subjects) && fields.target_subjects.length > 0 && !prev.target_subject) {
+            updated.target_subject = fields.target_subjects[0];
+            newAutoFilled.add('target_subject');
+          } else if (fields.target_subject && !prev.target_subject) {
+            updated.target_subject = fields.target_subject;
+            newAutoFilled.add('target_subject');
           }
           return updated;
         });
@@ -850,9 +858,12 @@ export default function FindUni() {
   // Subject autocomplete
   const onSubjectChange = (v) => {
     update('target_subject', v);
-    const allSuggestions = [...SUBJECT_SUGGESTIONS];
+    let allSuggestions = [...SUBJECT_SUGGESTIONS];
     // If CV analysis suggested a subject, push it to top
-    if (cvAnalysis?.target_subject && !allSuggestions.includes(cvAnalysis.target_subject)) {
+    if (cvAnalysis && cvAnalysis.target_subjects) {
+      const topRecs = Array.isArray(cvAnalysis.target_subjects) ? cvAnalysis.target_subjects : [cvAnalysis.target_subjects];
+      allSuggestions = [...topRecs.filter(s => !SUBJECT_SUGGESTIONS.includes(s)), ...SUBJECT_SUGGESTIONS];
+    } else if (cvAnalysis?.target_subject && !allSuggestions.includes(cvAnalysis.target_subject)) {
       allSuggestions.unshift(cvAnalysis.target_subject);
     }
     setSuggestions(v.length > 1 ? allSuggestions.filter(s => s.toLowerCase().includes(v.toLowerCase())).slice(0, 6) : []);
@@ -1119,10 +1130,12 @@ export default function FindUni() {
                               <p className="text-xs text-gray-700">{cvAnalysis.education_summary}</p>
                             </div>
                           )}
-                          {cvAnalysis.target_subject && (
+                          {cvAnalysis.target_subjects && (
                             <div className="bg-white/80 rounded-lg px-3 py-2">
-                              <p className="text-[10px] text-gray-400 font-bold uppercase">Recommended Subject</p>
-                              <p className="text-xs text-gray-700 font-semibold">{cvAnalysis.target_subject}</p>
+                              <p className="text-[10px] text-gray-400 font-bold uppercase">Recommended Subjects</p>
+                              <p className="text-xs text-gray-700 font-semibold truncate">
+                                {Array.isArray(cvAnalysis.target_subjects) ? cvAnalysis.target_subjects.join(', ') : cvAnalysis.target_subjects}
+                              </p>
                             </div>
                           )}
                           {cvAnalysis.skills && (
@@ -1229,14 +1242,17 @@ export default function FindUni() {
                   <input type="text" placeholder="e.g. Computer Science, MBA..." className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all" value={profile.target_subject} onChange={e => onSubjectChange(e.target.value)} onBlur={() => setTimeout(() => setSuggestions([]), 200)} />
                   {suggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-20 bg-white border border-gray-200 rounded-xl mt-1 shadow-lg overflow-hidden">
-                      {suggestions.map((s, i) => (
-                        <div key={s} className={`px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 cursor-pointer transition-colors ${i === 0 && cvAnalysis?.target_subject === s ? 'bg-emerald-50 border-l-2 border-emerald-400' : ''}`} onMouseDown={() => { update('target_subject', s); setSuggestions([]); }}>
-                          {s}
-                          {i === 0 && cvAnalysis?.target_subject === s && (
-                            <span className="ml-2 text-[10px] text-emerald-600 font-semibold">Recommended from CV</span>
-                          )}
-                        </div>
-                      ))}
+                      {suggestions.map((s, i) => {
+                        const isRecommended = cvAnalysis?.target_subjects?.includes(s) || cvAnalysis?.target_subject === s;
+                        return (
+                          <div key={s} className={`px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 cursor-pointer transition-colors ${isRecommended ? 'bg-emerald-50 border-l-2 border-emerald-400' : ''}`} onMouseDown={() => { update('target_subject', s); setSuggestions([]); }}>
+                            {s}
+                            {isRecommended && (
+                              <span className="ml-2 text-[10px] text-emerald-600 font-semibold">Recommended from CV</span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

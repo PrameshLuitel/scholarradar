@@ -1104,23 +1104,23 @@ async def analyze_profile(
             try:
                 # Send metadata first
                 log.info("sending_metadata", courses=len(courses), scholarships=len(scholarships))
-                yield f"data: {json.dumps({'type': 'metadata', 'courses_found': len(courses), 'scholarships_found': len(scholarships)})}\\n\\n"
+                yield f"data: {json.dumps({'type': 'metadata', 'courses_found': len(courses), 'scholarships_found': len(scholarships)})}\n\n"
                 
                 # Send CV analysis if available (for frontend auto-fill confirmation)
                 if cv_analysis:
-                    yield f"data: {json.dumps({'type': 'cv_extracted', 'data': cv_analysis})}\\n\\n"
+                    yield f"data: {json.dumps({'type': 'cv_extracted', 'data': cv_analysis})}\n\n"
                 
                 # Send courses data
                 if courses:
                     log.info("sending_courses", count=len(courses))
-                    yield f"data: {json.dumps({'type': 'courses', 'data': courses})}\\n\\n"
+                    yield f"data: {json.dumps({'type': 'courses', 'data': courses})}\n\n"
                 
                 # Send scholarships data
                 if scholarships:
                     log.info("sending_scholarships", count=len(scholarships))
-                    yield f"data: {json.dumps({'type': 'scholarships', 'data': scholarships})}\\n\\n"
+                    yield f"data: {json.dumps({'type': 'scholarships', 'data': scholarships})}\n\n"
                 
-                yield f"data: {json.dumps({'type': 'status', 'content': 'Generating your personalized analysis...'})}\\n\\n"
+                yield f"data: {json.dumps({'type': 'status', 'content': 'Generating your personalized analysis...'})}\n\n"
 
                 # Use simple streaming
                 from src.utils.groq_cascade import stream_groq_response
@@ -1134,9 +1134,9 @@ async def analyze_profile(
                     temperature=0.7,
                 ):
                     if event["type"] == "model":
-                        yield f"data: {json.dumps({'type': 'model', 'model': event['model'], 'display_name': get_model_display_name(event['model'])})}\\n\\n"
+                        yield f"data: {json.dumps({'type': 'model', 'model': event['model'], 'display_name': get_model_display_name(event['model'])})}\n\n"
                     elif event["type"] == "chunk":
-                        yield f"data: {json.dumps({'type': 'chunk', 'content': event['content']})}\\n\\n"
+                        yield f"data: {json.dumps({'type': 'chunk', 'content': event['content']})}\n\n"
                     elif event["type"] == "done":
                         total_time = round(time.time() - started, 2)
                         done_payload = {
@@ -1147,18 +1147,18 @@ async def analyze_profile(
                             'cost_usd': event.get('cost_usd', 0),
                             'total_time_seconds': total_time
                         }
-                        yield f"data: {json.dumps(done_payload)}\\n\\n"
+                        yield f"data: {json.dumps(done_payload)}\n\n"
                         log.info("stream_complete", total_time=total_time)
                     elif event["type"] == "error":
-                        yield f"data: {json.dumps({'type': 'error', 'message': event['message']})}\\n\\n"
+                        yield f"data: {json.dumps({'type': 'error', 'message': event['message']})}\n\n"
                         log.error("stream_error", message=event['message'])
 
-                yield "data: [DONE]\\n\\n"
+                yield "data: [DONE]\n\n"
                 log.info("advisor_stream_finished")
                 
             except Exception as e:
                 log.error("advisor_stream_failed", error=str(e), exc_info=True)
-                yield f"data: {json.dumps({'type': 'error', 'message': f'Analysis failed: {str(e)}'})}\\n\\n"
+                yield f"data: {json.dumps({'type': 'error', 'message': f'Analysis failed: {str(e)}'})}\n\n"
 
         return StreamingResponse(
             event_stream(),

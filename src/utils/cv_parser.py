@@ -375,7 +375,7 @@ async def extract_structured_profile(cv_text: str) -> dict:
         
         # Always ask for fields regex can't handle well
         always_fields = [
-            '"target_subject": "the best subject for this student to study next based on their background (2-4 words, e.g. Computer Science, Data Science, MBA). IMPORTANT: infer this from their education + experience"',
+            '"target_subjects": ["list", "of", "3", "best", "subjects", "for", "this", "student", "to", "study", "next", "e.g.", "Computer Science", "Data Science", "MBA"]',
             '"career_goal": "likely career goal based on their experience and education (1 sentence)"',
             '"skills": ["list", "of", "top", "5-8", "skills"]',
             '"education_summary": "one line summary of highest education, e.g. BSc Computer Science from Tribhuvan University (2020)"',
@@ -391,7 +391,7 @@ CRITICAL RULES:
 1. Return ONLY valid JSON — no markdown, no explanation, no code fences
 2. For nationality, use lowercase (e.g. "nepalese", "indian", "chinese")
 3. For current_qualification, use ONLY: "high_school", "bachelors", "masters", "doctorate"
-4. For target_subject, infer what makes MOST sense as the NEXT degree based on their education + career trajectory
+4. For target_subjects, infer what makes MOST sense as the NEXT degree based on their education + career trajectory, returning 2-3 recommendations.
 5. Be specific and actionable — no generic advice
 6. If you can't determine a field, use null (not "unknown")
 
@@ -416,7 +416,7 @@ Return JSON with these fields:
                 profile[key] = value
         
         # Always take LLM's semantic analysis fields (skills, career_goal, etc.)
-        for key in ['target_subject', 'career_goal', 'skills', 'education_summary', 'strengths', 'gaps']:
+        for key in ['target_subjects', 'career_goal', 'skills', 'education_summary', 'strengths', 'gaps']:
             if key in llm_data and llm_data[key]:
                 profile[key] = llm_data[key]
         
