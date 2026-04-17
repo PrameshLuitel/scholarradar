@@ -1184,3 +1184,5 @@ async def analyze_profile(
             status_code=500,
             content={"error": f"Analysis failed: {str(e)}"},
         )
+
+# force render update
