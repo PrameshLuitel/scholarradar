@@ -1,3 +1,4 @@
+// UPDATED: Force git to detect changes - Table-only CRICOS display
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Sparkles, Filter, ChevronLeft, ChevronRight, GraduationCap, MapPin, DollarSign, Clock, Building2, BookOpen, Calendar, Phone, Globe, ExternalLink, ChevronDown, ChevronUp, Mail, User, Building, PhoneCall } from 'lucide-react';
