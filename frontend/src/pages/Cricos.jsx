@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ChevronDown, ChevronUp, ExternalLink, MapPin, DollarSign, Clock, Building2, BookOpen, Phone, Mail, Globe, Filter } from 'lucide-react';
 
+// Render rebuild trigger: 2026-04-18 21:20:00 - Force new table version deployment
+
 export default function Cricos() {
   const [data, setData] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
