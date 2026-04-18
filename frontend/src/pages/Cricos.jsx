@@ -97,7 +97,7 @@ export default function Cricos() {
             transition={{ delay: 0.1 }}
             className="text-lg text-gray-600"
           >
-            Search through thousands of officially registered courses for international students. Use our AI to filter precisely.
+            Search and filter thousands of Australian courses for international students using AI.
           </motion.p>
         </div>
 
