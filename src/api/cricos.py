@@ -100,6 +100,13 @@ async def search_cricos(req: CricosSearchRequest):
                     parsed_filters['max_fee'] = amount
                     break
             
+            # Fee intent words (cheap, affordable, budget)
+            if not parsed_filters.get('max_fee'):
+                if any(x in query_lower for x in ['cheap', 'affordable', 'low cost', 'budget', 'inexpensive', 'low-price']):
+                    parsed_filters['max_fee'] = 25000  # Default "cheap" threshold
+                elif any(x in query_lower for x in ['moderate', 'reasonable', 'mid-range', 'mid range']):
+                    parsed_filters['max_fee'] = 40000  # Default "moderate" threshold
+            
             # Duration extraction (patterns: "2 years", "24 months", "1-2 years")
             duration_patterns = [
                 (r'(?:min|minimum|at least|from)\s*(\d+)\s*(?:months?|mo\b)', 'min_duration', 1),
@@ -158,7 +165,8 @@ IMPORTANT: Fix typos and misspellings automatically!
 - "sceince" → "science", "data sceince" → "data science"
 - "engeneering" → "engineering", "nursng" → "nursing"
 - "busines" → "business", "computr" → "computer"
-- ANY misspelled field of study should be corrected to the proper term
+- "queensland" → "QLD", "victoria" → "VIC", "new south wales" → "NSW"
+- ANY misspelled field of study, location, or term should be corrected
 
 CRITICAL RULES FOR DEGREE TYPES:
 - "MBA" or "mba" → keyword: "MBA business administration" (KEEP "MBA" in keyword!)
@@ -167,24 +175,45 @@ CRITICAL RULES FOR DEGREE TYPES:
 - "MA" or "ma" → keyword: "MA arts"
 - DO NOT remove MBA, MSBA, MSC, MA from keyword - they are important search terms!
 
+LOCATION MAPPING (CRITICAL):
+- Full state names: "queensland"→"QLD", "victoria"→"VIC", "new south wales"→"NSW", "western australia"→"WA", "south australia"→"SA", "tasmania"→"TAS", "australian capital territory"→"ACT", "northern territory"→"NT"
+- Cities: "sydney"→"NSW", "melbourne"→"VIC", "brisbane"→"QLD", "perth"→"WA", "adelaide"→"SA", "hobart"→"TAS", "canberra"→"ACT", "darwin"→"NT"
+- "gold coast"→"QLD", "sunshine coast"→"QLD", "newcastle"→"NSW", "wollongong"→"NSW", "geelong"→"VIC"
+
+FEE INTENT RECOGNITION:
+- "cheap", "affordable", "low cost", "budget", "inexpensive" → max_fee: 25000
+- "moderate", "reasonable", "mid-range" → max_fee: 40000
+- "expensive", "premium", "high-end" → NO fee filter (show all)
+- "under 50k", "below 40000", "less than 30k" → extract exact number
+
+DURATION INTENT:
+- "short", "quick", "fast" → max_duration: 12 (1 year)
+- "long", "extended" → min_duration: 24 (2 years)
+- "2 years", "24 months", "3 year" → extract exact duration
+
+COURSE CODE DETECTION:
+- CRICOS codes pattern: 1 letter + 5 digits (e.g., "098765", "A12345")
+- If found, add to keyword as exact search term
+
 Available fields:
-- state: NSW, VIC, QLD, WA, SA, TAS, ACT, NT (sydney→NSW, melbourne→VIC, brisbane→QLD, perth→WA, adelaide→SA, hobart→TAS, canberra→ACT, darwin→NT)
-- level: bachelor, master, doctorate, diploma, certificate, vocational (undergraduate→bachelor, postgraduate→master, phd/doctor→doctorate)
-- max_fee: number (under 50k→50000, below 40000→40000, around 30k→30000)
-- min_duration: number in months (at least 2 years→24)
-- max_duration: number in months (up to 3 years→36)
-- university: institution name (Monash, UNSW, University of Sydney, Bond, etc.)
-- keyword: subject/field/course type (MBA, MSBA, business analytics, computer science, nursing, engineering, IT, data science, AI, psychology)
+- state: NSW, VIC, QLD, WA, SA, TAS, ACT, NT
+- level: bachelor, master, doctorate, diploma, certificate, vocational
+- max_fee: number in AUD (cheap→25000, under 50k→50000)
+- min_duration: number in months
+- max_duration: number in months
+- university: institution name
+- keyword: course name, subject, field of study, course code, ANY search terms
 
 Rules:
 1. ALWAYS fix typos/misspellings in the query before extracting
-2. Extract EVERYTHING mentioned - be thorough
-3. KEEP degree abbreviations (MBA, MSBA, MSC, MA, BBA, etc.) in the keyword field - they are critical for search!
-4. Map abbreviations: MSBA→"MSBA business analytics", MBA→"MBA business administration", IT→"IT information technology"
-5. Handle "OR" queries: "data science or engineering" → keyword:"data science engineering"
-6. Infer implicit filters: "sydney uni"→university:"University of Sydney", "melb uni"→university:"University of Melbourne"
-7. For field of study, use the most specific term: "business analytics" not just "business"
-8. Return ONLY valid JSON
+2. Extract EVERYTHING mentioned - be thorough and liberal
+3. KEEP degree abbreviations (MBA, MSBA, MSC, MA, BBA, etc.) in the keyword field
+4. Map ALL location names (full names, abbreviations, cities) to proper state codes
+5. Recognize fee intent words (cheap, affordable, budget) and set reasonable max_fee
+6. Handle course codes - keep them in keyword for exact matching
+7. For "I want to study X" or "looking for X" - extract X as keyword
+8. Handle "OR" queries: "data science or engineering" → keyword:"data science engineering"
+9. Return ONLY valid JSON with the fields you found (omit fields not mentioned)
 
 Examples:
 - "msba" → {"keyword": "MSBA business analytics"}
@@ -192,13 +221,20 @@ Examples:
 - "msba in sydney under 50k" → {"keyword": "MSBA business analytics", "state": "NSW", "max_fee": 50000, "level": "master"}
 - "mba" → {"keyword": "MBA business administration"}
 - "mba in sydney" → {"keyword": "MBA business administration", "state": "NSW"}
+- "I want to do an engineering course in queensland for cheap" → {"keyword": "engineering", "state": "QLD", "max_fee": 25000}
+- "cheap nursing courses in melbourne" → {"keyword": "nursing", "state": "VIC", "max_fee": 25000}
 - "phd computer science monash" → {"level": "doctorate", "keyword": "computer science", "university": "Monash"}
 - "I want to study nursing in brisbane" → {"keyword": "nursing", "state": "QLD"}
-- "cheap engineering courses in melbourne" → {"keyword": "engineering", "state": "VIC", "max_fee": 30000}
+- "affordable IT courses in Perth" → {"keyword": "IT information technology", "state": "WA", "max_fee": 25000}
 - "MBA at UNSW" → {"keyword": "MBA business administration", "university": "UNSW", "level": "master"}
 - "data science or AI masters" → {"keyword": "data science artificial intelligence", "level": "master"}
+- "short business courses in Sydney" → {"keyword": "business", "state": "NSW", "max_duration": 12}
+- "098765" → {"keyword": "098765"}  (course code)
+- "Master of Data Science at University of Melbourne" → {"keyword": "data science", "level": "master", "university": "University of Melbourne"}
+- "cheap bachelor degree in victoria" → {"keyword": "bachelor", "state": "VIC", "max_fee": 25000, "level": "bachelor"}
 - "DATA SCEINCE OR engineering" → {"keyword": "data science engineering"} (typo fixed)
 - "computr sceince masters" → {"keyword": "computer science", "level": "master"} (typos fixed)
+- "I'm looking for affordable psychology programs in Adelaide" → {"keyword": "psychology", "state": "SA", "max_fee": 25000}
 """
             user = f"Query: {req.query}"
             
@@ -339,10 +375,26 @@ Examples:
                 if term.endswith('s') and not term.endswith('ss'):
                     additional_terms.append(term[:-1])  # engineeringS → engineering
                 if term.endswith('ing'):
-                    additional_terms.append(term[:-3])  # engineerING → engineer
+                    additional_terms.append(term[:-3] if len(term) > 4 else term)  # engineerING → engineer
                 if term.endswith('ion'):
-                    additional_terms.append(term[:-3])  # informatION → informat (less useful but helps)
+                    additional_terms.append(term[:-3])  # informatION → informat
+                # Handle "Master of X" or "Bachelor of X" patterns
+                if 'master of ' in keyword_lower or 'bachelor of ' in keyword_lower:
+                    # Extract the subject after "of"
+                    import re as re_module
+                    of_match = re_module.search(r'(?:master|bachelor) of (.+)', keyword_lower)
+                    if of_match:
+                        additional_terms.append(of_match.group(1).strip())
             search_terms.extend(additional_terms)
+            
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_terms = []
+            for term in search_terms:
+                if term not in seen:
+                    seen.add(term)
+                    unique_terms.append(term)
+            search_terms = unique_terms
             
             # Build OR query for all search terms
             or_conditions = []
@@ -352,6 +404,9 @@ Examples:
                 # Also search in level for degree types like MBA, MSBA
                 if len(term) <= 10:  # Short terms like MBA, MSBA
                     or_conditions.append(f"level.ilike.%{term}%")
+                # Search in cricos_code for exact course codes
+                if re.match(r'^\d{5,6}$', term) or re.match(r'^[A-Z]\d{5}$', term, re.IGNORECASE):
+                    or_conditions.append(f"cricos_code.ilike.%{term}%")
             
             query_builder = query_builder.or_(",".join(or_conditions))
         
@@ -359,9 +414,20 @@ Examples:
         if req.query and req.query.strip() and not keyword and not parsed_filters.get("university"):
             # Search across name, university, and subject
             query_builder = query_builder.or_(f"name.ilike.%{req.query}%,university.ilike.%{req.query}%,subject.ilike.%{req.query}%")
+        
+        # Check if user wants sorting by fees (cheap, affordable, lowest fees)
+        sort_by_fee = False
+        if req.query:
+            query_lower = req.query.lower()
+            sort_by_fee = any(x in query_lower for x in ['cheap', 'affordable', 'lowest', 'budget', 'inexpensive', 'low cost'])
             
         # Pagination
         offset = (req.page - 1) * req.page_size
+        
+        # Apply sorting - if "cheap" is mentioned, sort by fees ascending
+        if sort_by_fee:
+            query_builder = query_builder.order("tuition_fee", desc=False)  # Lowest to highest
+        
         query_builder = query_builder.range(offset, offset + req.page_size - 1)
         
         result = query_builder.execute()
