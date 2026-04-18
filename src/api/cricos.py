@@ -48,6 +48,7 @@ async def search_cricos(req: CricosSearchRequest):
         # 1. Smart filter extraction - regex first (0 tokens), AI fallback (<50 tokens)
         if req.query and req.query.strip():
             query_lower = req.query.lower().strip()
+            import re as regex_module
             
             # FAST PATH: Regex-based extraction (0 tokens, instant)
             # City→State mapping
@@ -82,7 +83,6 @@ async def search_cricos(req: CricosSearchRequest):
                 parsed_filters['level'] = 'certificate'
             
             # Fee extraction (patterns: "under 50k", "below 40000", "less than 30k")
-            import re as regex_module
             fee_patterns = [
                 r'(?:under|below|less than|upto|up to|max|maximum)\s*\$?\s*(\d+(?:\.\d+)?)(k|k\b|000)?',
                 r'\$?(\d+(?:\.\d+)?)(k|k\b|000)\s*(?:aud|dollars)?(?:\s|$)'
