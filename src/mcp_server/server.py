@@ -150,7 +150,16 @@ async def serve_frontend(request: Request, full_path: str):
 
     file_path = FRONTEND_DIST / full_path
     if full_path and file_path.exists() and file_path.is_file():
-        return FileResponse(str(file_path))
+        # Add cache-control headers to prevent stale content
+        from fastapi.responses import FileResponse as FR
+        response = FR(str(file_path))
+        if is_asset:
+            # Cache assets for 1 year (Vite adds content hashes)
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            # Never cache HTML files
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
 
     if is_asset:
         from starlette.exceptions import HTTPException
@@ -158,7 +167,13 @@ async def serve_frontend(request: Request, full_path: str):
 
     index_path = FRONTEND_DIST / "index.html"
     if index_path.exists():
-        return FileResponse(str(index_path))
+        # Never cache index.html to ensure fresh JS/CSS loads
+        from fastapi.responses import FileResponse as FR
+        response = FR(str(index_path))
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
     return JSONResponse(status_code=404, content={"error": "Frontend not built."})
 
