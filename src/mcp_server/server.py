@@ -186,6 +186,6 @@ asgi_app = MCPDispatcher(fastapi_app=app, mcp_asgi_app=mcp_app)
 
 # 9. Entry Point
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5173))
+    port = int(os.getenv("PORT", 8000))
     log.info("server_start", port=port, env=os.getenv("RENDER_EXTERNAL_URL", "local"))
     uvicorn.run(asgi_app, host="0.0.0.0", port=port)
