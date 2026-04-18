@@ -104,8 +104,39 @@ If a field is not mentioned, exclude it. Return ONLY valid JSON."""
         
         result = query_builder.execute()
         
+        # Enrich course data with university contact information
+        enriched_data = []
+        if result.data:
+            # Get unique provider codes from courses
+            provider_codes = list(set([c.get('provider_code') for c in result.data if c.get('provider_code')]))
+            
+            # Fetch university details for these provider codes
+            university_map = {}
+            if provider_codes:
+                try:
+                    uni_query = db.table("universities").select("*").in_("provider_code", provider_codes)
+                    uni_result = uni_query.execute()
+                    if uni_result.data:
+                        university_map = {u['provider_code']: u for u in uni_result.data if u.get('provider_code')}
+                except Exception as e:
+                    log.warning("failed_to_fetch_university_data", error=str(e))
+            
+            # Merge university data into courses
+            for course in result.data:
+                enriched_course = course.copy()
+                provider_code = course.get('provider_code')
+                if provider_code and provider_code in university_map:
+                    uni_data = university_map[provider_code]
+                    enriched_course['website'] = uni_data.get('website')
+                    enriched_course['contact_phone'] = uni_data.get('phone_number')
+                    enriched_course['contact_email'] = uni_data.get('email_address')
+                    enriched_course['institution_type'] = uni_data.get('institution_type')
+                    enriched_course['postal_address'] = uni_data.get('postal_address')
+                    enriched_course['total_students'] = uni_data.get('total_students')
+                enriched_data.append(enriched_course)
+        
         return {
-            "data": result.data,
+            "data": enriched_data,
             "total_count": result.count,
             "page": req.page,
             "page_size": req.page_size,

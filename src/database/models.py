@@ -76,6 +76,10 @@ class University(BaseDBModel):
     idp_profile_url: Optional[str] = None
     provider_code: Optional[str] = None
     state: Optional[str] = None
+    phone_number: Optional[str] = None
+    email_address: Optional[str] = None
+    postal_address: Optional[str] = None
+    institution_type: Optional[str] = None
 
 class VisaRequirement(BaseModel):
     id: Optional[UUID] = None

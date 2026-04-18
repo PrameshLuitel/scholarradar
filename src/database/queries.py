@@ -153,23 +153,34 @@ async def bulk_upsert_courses(courses: List[Course]) -> List[str]:
     db = get_db()
     data = []
     for c in courses:
-        d = c.model_dump(mode='json', exclude_none=True)
+        d = c.model_dump(mode='json', exclude_none=False)  # Include None values to update NULL fields
         d.pop("id", None)
         d.pop("created_at", None)
         data.append(d)
     
     all_ids = []
-    chunk_size = 500
+    chunk_size = 100  # Smaller chunks to avoid duplicates
     for i in range(0, len(data), chunk_size):
         chunk = data[i:i + chunk_size]
         try:
             response = await asyncio.to_thread(
-                db.table("courses").upsert(chunk, on_conflict="name,university").execute
+                db.table("courses").upsert(chunk, on_conflict="cricos_code").execute
             )
             if response.data:
                 all_ids.extend([row["id"] for row in response.data if "id" in row])
         except Exception as e:
             logger.error("courses_bulk_upsert_failed", error=str(e), count=len(chunk))
+            # If bulk fails, try individual updates
+            for course_data in chunk:
+                try:
+                    if course_data.get('cricos_code'):
+                        resp = await asyncio.to_thread(
+                            db.table("courses").update(course_data).eq("cricos_code", course_data['cricos_code']).execute
+                        )
+                        if resp.data:
+                            all_ids.extend([row["id"] for row in resp.data if "id" in row])
+                except Exception as inner_e:
+                    logger.debug("course_individual_update_failed", cricos_code=course_data.get('cricos_code'), error=str(inner_e))
     return all_ids
 
 
