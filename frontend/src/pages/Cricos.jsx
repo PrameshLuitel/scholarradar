@@ -78,6 +78,14 @@ export default function Cricos() {
     return `${currency || 'AUD'} ${amount.toLocaleString()}`;
   };
 
+  const formatDuration = (months) => {
+    if (!months) return 'Not specified';
+    if (months < 12) return `${months} months`;
+    const years = Math.floor(months / 12);
+    const remainingMonths = months % 12;
+    return remainingMonths > 0 ? `${years} year${years > 1 ? 's' : ''} ${remainingMonths} months` : `${years} year${years > 1 ? 's' : ''}`;
+  };
+
   return (
     <div className="min-h-screen bg-[#fafafa] pt-24 pb-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -131,6 +139,7 @@ export default function Cricos() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700 w-10"></th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Course</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Institution</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">CRICOS Code</th>
@@ -142,15 +151,116 @@ export default function Cricos() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {data.map((course) => (
-                      <tr key={course.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900">{course.name}</td>
-                        <td className="px-4 py-3 text-gray-700">{course.university}</td>
-                        <td className="px-4 py-3 font-mono text-xs">{course.cricos_code}</td>
-                        <td className="px-4 py-3 text-gray-700">{course.level}</td>
-                        <td className="px-4 py-3 text-gray-700">{course.city}, {course.state}</td>
-                        <td className="px-4 py-3 text-right font-semibold">{course.tuition_fee ? `$${course.tuition_fee.toLocaleString()}` : '-'}</td>
-                        <td className="px-4 py-3 text-right">{course.duration_months ? `${course.duration_months} mo` : '-'}</td>
-                      </tr>
+                      <React.Fragment key={course.id}>
+                        <tr 
+                          className="hover:bg-gray-50 cursor-pointer" 
+                          onClick={() => toggleExpand(course.id)}
+                        >
+                          <td className="px-4 py-3">
+                            {expandedCourse === course.id ? (
+                              <ChevronUp className="w-4 h-4 text-gray-500" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-gray-500" />
+                            )}
+                          </td>
+                          <td className="px-4 py-3 font-medium text-gray-900">{course.name}</td>
+                          <td className="px-4 py-3 text-gray-700">{course.university}</td>
+                          <td className="px-4 py-3 font-mono text-xs">{course.cricos_code || '-'}</td>
+                          <td className="px-4 py-3 text-gray-700">{course.level || '-'}</td>
+                          <td className="px-4 py-3 text-gray-700">{course.city && course.state ? `${course.city}, ${course.state}` : course.city || course.state || '-'}</td>
+                          <td className="px-4 py-3 text-right font-semibold">{course.tuition_fee ? `$${course.tuition_fee.toLocaleString()}` : '-'}</td>
+                          <td className="px-4 py-3 text-right">{course.duration_months ? formatDuration(course.duration_months) : '-'}</td>
+                        </tr>
+                        
+                        {/* Expanded Details */}
+                        {expandedCourse === course.id && (
+                          <tr>
+                            <td colSpan="8" className="px-6 py-4 bg-gray-50">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="border-b border-gray-200">
+                                    <th className="pb-2 text-left font-semibold text-gray-700">Field</th>
+                                    <th className="pb-2 text-left font-semibold text-gray-700">Value</th>
+                                    <th className="pb-2 text-left font-semibold text-gray-700">Field</th>
+                                    <th className="pb-2 text-left font-semibold text-gray-700">Value</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  <tr>
+                                    <td className="py-2 text-gray-600 font-medium">Course Name</td>
+                                    <td className="py-2 text-gray-900">{course.name || 'Not specified'}</td>
+                                    <td className="py-2 text-gray-600 font-medium">CRICOS Code</td>
+                                    <td className="py-2 font-mono text-gray-900">{course.cricos_code || 'Not specified'}</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-2 text-gray-600 font-medium">Institution</td>
+                                    <td className="py-2 text-gray-900">{course.university || 'Not specified'}</td>
+                                    <td className="py-2 text-gray-600 font-medium">Provider Code</td>
+                                    <td className="py-2 font-mono text-gray-900">{course.provider_code || 'Not specified'}</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-2 text-gray-600 font-medium">Course Level</td>
+                                    <td className="py-2 text-gray-900">{course.level || 'Not specified'}</td>
+                                    <td className="py-2 text-gray-600 font-medium">Institution Type</td>
+                                    <td className="py-2 text-gray-900">{course.institution_type || 'Not specified'}</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-2 text-gray-600 font-medium">Duration</td>
+                                    <td className="py-2 text-gray-900">{course.duration_months ? formatDuration(course.duration_months) : 'Not specified'}</td>
+                                    <td className="py-2 text-gray-600 font-medium">Total Students</td>
+                                    <td className="py-2 text-gray-900">{course.total_students ? course.total_students.toLocaleString() : 'Not specified'}</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-2 text-gray-600 font-medium">Tuition Fee</td>
+                                    <td className="py-2 text-gray-900">{course.tuition_fee ? formatCurrency(course.tuition_fee, course.currency) : 'Not specified'}</td>
+                                    <td className="py-2 text-gray-600 font-medium">Location</td>
+                                    <td className="py-2 text-gray-900">{course.city && course.state ? `${course.city}, ${course.state}` : course.city || course.state || 'Not specified'}</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-2 text-gray-600 font-medium">Subject</td>
+                                    <td className="py-2 text-gray-900">{course.subject || 'Not specified'}</td>
+                                    <td className="py-2 text-gray-600 font-medium">Postal Address</td>
+                                    <td className="py-2 text-gray-900">{course.postal_address || 'Not specified'}</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-2 text-gray-600 font-medium">Subject Category</td>
+                                    <td className="py-2 text-gray-900">{course.subject_category || 'Not specified'}</td>
+                                    <td className="py-2 text-gray-600 font-medium">Website</td>
+                                    <td className="py-2 text-gray-900">
+                                      {course.website ? (
+                                        <a href={course.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
+                                          {course.website}
+                                          <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                      ) : 'Not specified'}
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-2 text-gray-600 font-medium">Status</td>
+                                    <td className="py-2 text-gray-900">{course.is_active !== undefined ? (course.is_active ? 'Active' : 'Inactive') : 'Not specified'}</td>
+                                    <td className="py-2 text-gray-600 font-medium">Phone</td>
+                                    <td className="py-2 text-gray-900">
+                                      {course.contact_phone ? (
+                                        <a href={`tel:${course.contact_phone}`} className="text-blue-600 hover:underline">{course.contact_phone}</a>
+                                      ) : 'Not specified'}
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-2 text-gray-600 font-medium">Last Verified</td>
+                                    <td className="py-2 text-gray-900">{course.last_verified ? new Date(course.last_verified).toLocaleDateString('en-AU') : 'Not verified'}</td>
+                                    <td className="py-2 text-gray-600 font-medium">Email</td>
+                                    <td className="py-2 text-gray-900">
+                                      {course.contact_email ? (
+                                        <a href={`mailto:${course.contact_email}`} className="text-blue-600 hover:underline">{course.contact_email}</a>
+                                      ) : 'Not specified'}
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
