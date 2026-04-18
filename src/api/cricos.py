@@ -52,8 +52,18 @@ If a field is not mentioned, exclude it. Return ONLY valid JSON."""
                 log.warning("cricos_ai_parse_failed", error=str(e), query=req.query)
         
         # 2. Build Supabase Query
-        # Target Australian courses (CRICOS data)
-        query_builder = db.table("courses").select("*", count="exact").eq("country", "australia")
+        # Target ONLY CRICOS courses (from data.gov.au) - courses with cricos_code populated
+        # Once migration runs and scraper populates data, this will show real CRICOS data
+        query_builder = db.table("courses").select("*", count="exact")
+        
+        # Filter for courses that have CRICOS codes (official government data)
+        # Using not_.is_() to filter out NULL cricos_code values
+        # This ensures we only show real CRICOS data, not IDP data
+        try:
+            query_builder = query_builder.not_.is_("cricos_code", "null")
+        except:
+            # If column doesn't exist yet, fallback to Australian courses
+            query_builder = query_builder.eq("country", "australia")
         
         # Apply combined filters (Explicit UI filters take precedence over AI filters)
         state_filter = req.state or parsed_filters.get("state")
