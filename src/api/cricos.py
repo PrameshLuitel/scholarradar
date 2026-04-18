@@ -334,8 +334,6 @@ Examples:
             for term in search_terms:
                 or_conditions.append(f"name.ilike.%{term}%")
                 or_conditions.append(f"subject.ilike.%{term}%")
-                or_conditions.append(f"description.ilike.%{term}%")
-                or_conditions.append(f"level.ilike.%{term}%")
             
             query_builder = query_builder.or_(",".join(or_conditions))
         
@@ -343,20 +341,6 @@ Examples:
         if req.query and req.query.strip() and not keyword and not parsed_filters.get("university"):
             # Search across name, university, and subject
             query_builder = query_builder.or_(f"name.ilike.%{req.query}%,university.ilike.%{req.query}%,subject.ilike.%{req.query}%")
-        
-        # If AI extracted university but user also typed a query, combine them
-        if req.query and req.query.strip() and parsed_filters.get("university") and not keyword:
-            # Additional search in case query contains extra terms
-            query_builder = query_builder.or_(f"name.ilike.%{req.query}%,subject.ilike.%{req.query}%")
-        
-        # FALLBACK: If NO filters extracted at all, do broad search
-        if req.query and req.query.strip() and not parsed_filters:
-            query_builder = query_builder.or_(
-                f"name.ilike.%{req.query}%," 
-                f"university.ilike.%{req.query}%," 
-                f"subject.ilike.%{req.query}%," 
-                f"description.ilike.%{req.query}%"
-            )
             
         # Pagination
         offset = (req.page - 1) * req.page_size
@@ -412,7 +396,6 @@ Examples:
                     f"name.ilike.%{req.query}%," 
                     f"university.ilike.%{req.query}%," 
                     f"subject.ilike.%{req.query}%," 
-                    f"description.ilike.%{req.query}%," 
                     f"level.ilike.%{req.query}%"
                 )
                 broad_builder = broad_builder.range(offset, offset + req.page_size - 1)
