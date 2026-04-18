@@ -219,7 +219,7 @@ COURSE CODE DETECTION:
 
 AVAILABLE FIELDS TO EXTRACT:
 - state: NSW, VIC, QLD, WA, SA, TAS, ACT, NT
-- level: bachelor, master, doctorate, diploma, certificate, vocational
+- level: bachelor, bachelor with honours, master by coursework, master by research, doctorate, PhD, diploma, certificate, vocational, graduate certificate, graduate diploma
 - max_fee: number in AUD (cheap→25000, under 50k→50000)
 - min_duration: number in months
 - max_duration: number in months
@@ -301,6 +301,18 @@ QUERY TYPE EXAMPLES:
 - "Can you find me cheap business courses in Brisbane?" → {"keyword": "business", "state": "QLD", "max_fee": 25000}
 - "Show me MBA programs under 40k" → {"keyword": "MBA business administration", "max_fee": 40000, "level": "master"}
 - "What are some good data science courses in Melbourne?" → {"keyword": "data science", "state": "VIC"}
+
+**Level-Specific (Coursework vs Research):**
+- "master by research" → {"level": "master by research"}
+- "masters research" → {"level": "master by research"}
+- "master by coursework" → {"level": "master by coursework"}
+- "taught masters" → {"level": "master by coursework"}
+- "research masters PhD" → {"level": "master by research"}
+- "MBA" → {"keyword": "MBA business administration", "level": "master by coursework"}
+- "MPhil" → {"level": "master by research"}
+- "doctorate" → {"level": "doctorate"}
+- "PhD" → {"level": "doctorate"}
+- "bachelor honours" → {"level": "bachelor with honours"}
 """
             user = f"Query: {req.query}"
             
@@ -342,19 +354,39 @@ QUERY TYPE EXAMPLES:
             
         level_filter = req.level or parsed_filters.get("level")
         if level_filter and level_filter.lower() not in ["all", "any", ""]:
-            # Standardize level - more comprehensive mapping
+            # Standardize level - comprehensive mapping with coursework/research distinction
             lvl = level_filter.lower()
-            if any(k in lvl for k in ('undergrad', 'bachelor', 'b.a', 'b.s', 'bachelor degree')):
-                query_builder = query_builder.or_("level.ilike.%bachelor%,level.ilike.%undergraduate%")
-            elif any(k in lvl for k in ('postgrad', 'master', 'mba', 'master degree')):
-                query_builder = query_builder.or_("level.ilike.%master%,level.ilike.%postgraduate%")
+            
+            # Check for Master by Research vs Master by Coursework
+            if 'research' in lvl and 'master' in lvl:
+                # Master by Research
+                query_builder = query_builder.or_("level.ilike.%master by research%,level.ilike.%masters by research%,level.ilike.%research master%,level.ilike.%research masters%,level.ilike.%MPhil%")
+            elif 'coursework' in lvl and 'master' in lvl:
+                # Master by Coursework
+                query_builder = query_builder.or_("level.ilike.%master by coursework%,level.ilike.%masters by coursework%,level.ilike.%coursework master%,level.ilike.%taught master%,level.ilike.%MBA%,level.ilike.%Master of%")
+            elif any(k in lvl for k in ('undergrad', 'bachelor', 'b.a', 'b.s', 'bachelor degree')):
+                if 'honours' in lvl or 'hons' in lvl:
+                    # Bachelor with Honours
+                    query_builder = query_builder.or_("level.ilike.%bachelor with honours%,level.ilike.%bachelor honours%,level.ilike.%honours%")
+                else:
+                    # Regular Bachelor
+                    query_builder = query_builder.or_("level.ilike.%bachelor%,level.ilike.%undergraduate%")
+            elif any(k in lvl for k in ('postgrad', 'master', 'mba', 'master degree', 'masters')):
+                # Default to all masters (both coursework and research)
+                query_builder = query_builder.or_("level.ilike.%master%,level.ilike.%postgraduate%,level.ilike.%MBA%,level.ilike.%MPhil%")
             elif any(k in lvl for k in ('doctorate', 'phd', 'doctor', 'doctoral')):
                 # Match both "Doctoral Degree" and "Doctorate" 
                 query_builder = query_builder.or_("level.ilike.%doctoral%,level.ilike.%doctorate%,level.ilike.%phd%")
             elif any(k in lvl for k in ('diploma', 'advanced diploma')):
                 query_builder = query_builder.or_("level.ilike.%diploma%")
             elif any(k in lvl for k in ('certificate', 'cert')):
-                query_builder = query_builder.or_("level.ilike.%certificate%")
+                if 'graduate' in lvl:
+                    # Graduate Certificate
+                    query_builder = query_builder.or_("level.ilike.%graduate certificate%")
+                else:
+                    query_builder = query_builder.or_("level.ilike.%certificate%")
+            elif 'graduate diploma' in lvl:
+                query_builder = query_builder.or_("level.ilike.%graduate diploma%")
             elif 'vocational' in lvl or 'vet' in lvl:
                 query_builder = query_builder.or_("level.ilike.%vocational%")
             else:
