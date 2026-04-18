@@ -1,41 +1,61 @@
-// UPDATED: Force git to detect changes - Table-only CRICOS display
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Sparkles, Filter, ChevronLeft, ChevronRight, GraduationCap, MapPin, DollarSign, Clock, Building2, BookOpen, Calendar, Phone, Globe, ExternalLink, ChevronDown, ChevronUp, Mail, User, Building, PhoneCall } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, ExternalLink, MapPin, DollarSign, Clock, Building2, BookOpen, Phone, Mail, Globe, Filter } from 'lucide-react';
 
 export default function Cricos() {
   const [data, setData] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [aiFiltersApplied, setAiFiltersApplied] = useState(null);
   const [expandedCourse, setExpandedCourse] = useState(null);
+  const [universities, setUniversities] = useState([]);
   
   // Filter States
   const [query, setQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('All');
   const [selectedState, setSelectedState] = useState('All');
-  const [sortBy, setSortBy] = useState('name');
-  const [sortOrder, setSortOrder] = useState('asc');
+  const [selectedUniversity, setSelectedUniversity] = useState('All');
+  const [maxFee, setMaxFee] = useState(null);
+  const [minDuration, setMinDuration] = useState(null);
+  const [maxDuration, setMaxDuration] = useState(null);
   
   // Pagination
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
-  const levels = ['All', 'Undergraduate', 'Postgraduate', 'Bachelor', 'Master', 'Doctorate', 'Vocational', 'Diploma', 'Certificate'];
+  const levels = ['All', 'Bachelor', 'Master', 'Doctorate', 'Diploma', 'Certificate', 'Vocational'];
   const states = ['All', 'NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
+
+  // Fetch universities for filter
+  useEffect(() => {
+    const fetchUniversities = async () => {
+      try {
+        const response = await fetch('/api/cricos/universities');
+        const result = await response.json();
+        if (result.data) {
+          setUniversities(result.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch universities', error);
+      }
+    };
+    fetchUniversities();
+  }, []);
 
   const fetchCricosData = async (currentPage, searchQuery) => {
     setLoading(true);
-    setAiFiltersApplied(null);
     try {
       const response = await fetch('/api/cricos/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query: searchQuery,
+          query: searchQuery || undefined,
           state: selectedState === 'All' ? null : selectedState,
           level: selectedLevel === 'All' ? null : selectedLevel,
+          university: selectedUniversity === 'All' ? null : selectedUniversity,
+          max_fee: maxFee || undefined,
+          min_duration: minDuration || undefined,
+          max_duration: maxDuration || undefined,
           page: currentPage,
           page_size: pageSize
         })
@@ -45,9 +65,6 @@ export default function Cricos() {
       if (result.data) {
         setData(result.data);
         setTotalCount(result.total_count);
-        if (searchQuery && Object.keys(result.ai_filters_applied || {}).length > 0) {
-          setAiFiltersApplied(result.ai_filters_applied);
-        }
       } else {
         setData([]);
       }
@@ -60,7 +77,7 @@ export default function Cricos() {
 
   useEffect(() => {
     fetchCricosData(page, query);
-  }, [page, selectedLevel, selectedState, query]);
+  }, [page, selectedLevel, selectedState, selectedUniversity, maxFee, minDuration, maxDuration, query]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -74,192 +91,369 @@ export default function Cricos() {
     setExpandedCourse(expandedCourse === courseId ? null : courseId);
   };
 
-  const formatCurrency = (amount, currency) => {
-    if (!amount) return 'Not specified';
-    return `${currency || 'AUD'} ${amount.toLocaleString()}`;
+  const formatCurrency = (amount) => {
+    if (!amount) return '-';
+    return `$${amount.toLocaleString()}`;
   };
 
   const formatDuration = (months) => {
-    if (!months) return 'Not specified';
-    if (months < 12) return `${months} months`;
+    if (!months) return '-';
+    if (months < 12) return `${months}mo`;
     const years = Math.floor(months / 12);
     const remainingMonths = months % 12;
-    return remainingMonths > 0 ? `${years} year${years > 1 ? 's' : ''} ${remainingMonths} months` : `${years} year${years > 1 ? 's' : ''}`;
+    return remainingMonths > 0 ? `${years}y ${remainingMonths}mo` : `${years}y`;
   };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] pt-24 pb-16 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-[#fafafa] pt-24 pb-16">
+      <div className="max-w-7xl mx-auto px-6">
         
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">CRICOS Course Register</h1>
-          <p className="text-gray-600">Official Australian Government courses for international students ({totalCount.toLocaleString()} courses)</p>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="mb-10"
+        >
+          <h1 className="font-serif text-5xl font-medium text-gray-900 mb-3">
+            CRICOS Register
+          </h1>
+          <p className="text-lg text-gray-500 font-light">
+            Official Australian Government courses for international students
+          </p>
+          {totalCount > 0 && (
+            <p className="text-sm text-gray-400 mt-2">
+              {totalCount.toLocaleString()} courses available
+            </p>
+          )}
+        </motion.div>
 
         {/* Search & Filters */}
-        <div className="bg-white p-4 rounded-lg border border-gray-200 mb-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+          className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-8"
+        >
+          {/* AI Search Bar */}
           <form onSubmit={handleSearchSubmit} className="mb-4">
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search courses... e.g. 'MBA', 'Engineering', 'Nursing'"
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search naturally... 'MBA in Sydney under $50k' or 'Engineering at UNSW'"
+                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400"
+              />
+            </div>
           </form>
           
-          <div className="flex gap-4">
-            <select
-              value={selectedState}
-              onChange={(e) => { setSelectedState(e.target.value); setPage(1); }}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {states.map(s => <option key={s} value={s}>{s === 'All' ? 'All States' : s}</option>)}
-            </select>
+          {/* Filter Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+            {/* State Filter */}
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <select
+                value={selectedState}
+                onChange={(e) => { setSelectedState(e.target.value); setPage(1); }}
+                className="w-full pl-10 pr-8 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm text-gray-700 cursor-pointer appearance-none"
+              >
+                {states.map(s => <option key={s} value={s}>{s === 'All' ? 'All States' : s}</option>)}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
             
-            <select
-              value={selectedLevel}
-              onChange={(e) => { setSelectedLevel(e.target.value); setPage(1); }}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {levels.map(l => <option key={l} value={l}>{l === 'All' ? 'All Levels' : l}</option>)}
-            </select>
+            {/* Level Filter */}
+            <div className="relative">
+              <BookOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <select
+                value={selectedLevel}
+                onChange={(e) => { setSelectedLevel(e.target.value); setPage(1); }}
+                className="w-full pl-10 pr-8 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm text-gray-700 cursor-pointer appearance-none"
+              >
+                {levels.map(l => <option key={l} value={l}>{l === 'All' ? 'All Levels' : l}</option>)}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
+
+            {/* University Filter */}
+            <div className="relative col-span-2">
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <select
+                value={selectedUniversity}
+                onChange={(e) => { setSelectedUniversity(e.target.value); setPage(1); }}
+                className="w-full pl-10 pr-8 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm text-gray-700 cursor-pointer appearance-none"
+              >
+                <option value="All">All Universities</option>
+                {universities.map(uni => (
+                  <option key={uni.name} value={uni.name}>{uni.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
           </div>
-        </div>
+
+          {/* Advanced Filters */}
+          <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-100">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5 font-medium">Max Tuition (AUD)</label>
+              <input
+                type="number"
+                value={maxFee || ''}
+                onChange={(e) => { setMaxFee(e.target.value ? Number(e.target.value) : null); setPage(1); }}
+                placeholder="e.g. 50000"
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm text-gray-700 placeholder:text-gray-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5 font-medium">Min Duration (months)</label>
+              <input
+                type="number"
+                value={minDuration || ''}
+                onChange={(e) => { setMinDuration(e.target.value ? Number(e.target.value) : null); setPage(1); }}
+                placeholder="e.g. 12"
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm text-gray-700 placeholder:text-gray-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5 font-medium">Max Duration (months)</label>
+              <input
+                type="number"
+                value={maxDuration || ''}
+                onChange={(e) => { setMaxDuration(e.target.value ? Number(e.target.value) : null); setPage(1); }}
+                placeholder="e.g. 36"
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm text-gray-700 placeholder:text-gray-400"
+              />
+            </div>
+          </div>
+        </motion.div>
 
         {/* CRICOS Table */}
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+        >
           {loading ? (
-            <div className="p-8 text-center">Loading...</div>
+            <div className="p-16 text-center">
+              <div className="inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              <p className="mt-3 text-sm text-gray-500">Loading courses...</p>
+            </div>
           ) : data.length === 0 ? (
-            <div className="p-8 text-center text-gray-600">No courses found</div>
+            <div className="p-16 text-center">
+              <p className="text-gray-500">No courses found</p>
+              <p className="text-sm text-gray-400 mt-2">Try adjusting your search or filters</p>
+            </div>
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+                <table className="w-full">
+                  <thead className="bg-gray-50/80 border-b border-gray-100">
                     <tr>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700 w-10"></th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Course</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Institution</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">CRICOS Code</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Level</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Location</th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-700">Fee (AUD)</th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-700">Duration</th>
+                      <th className="w-12 px-6 py-4"></th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Institution</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Level</th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Fee</th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Duration</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {data.map((course) => (
+                  <tbody className="divide-y divide-gray-50">
+                    {data.map((course, idx) => (
                       <React.Fragment key={course.id}>
-                        <tr 
-                          className="hover:bg-gray-50 cursor-pointer" 
+                        <motion.tr 
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.02, duration: 0.3 }}
+                          className="hover:bg-blue-50/30 cursor-pointer transition-colors"
                           onClick={() => toggleExpand(course.id)}
                         >
-                          <td className="px-4 py-3">
+                          <td className="px-6 py-4">
                             {expandedCourse === course.id ? (
-                              <ChevronUp className="w-4 h-4 text-gray-500" />
+                              <ChevronUp className="w-4 h-4 text-gray-400" />
                             ) : (
-                              <ChevronDown className="w-4 h-4 text-gray-500" />
+                              <ChevronDown className="w-4 h-4 text-gray-400" />
                             )}
                           </td>
-                          <td className="px-4 py-3 font-medium text-gray-900">{course.name}</td>
-                          <td className="px-4 py-3 text-gray-700">{course.university}</td>
-                          <td className="px-4 py-3 font-mono text-xs">{course.cricos_code || '-'}</td>
-                          <td className="px-4 py-3 text-gray-700">{course.level || '-'}</td>
-                          <td className="px-4 py-3 text-gray-700">{course.city && course.state ? `${course.city}, ${course.state}` : course.city || course.state || '-'}</td>
-                          <td className="px-4 py-3 text-right font-semibold">{course.tuition_fee ? `$${course.tuition_fee.toLocaleString()}` : '-'}</td>
-                          <td className="px-4 py-3 text-right">{course.duration_months ? formatDuration(course.duration_months) : '-'}</td>
-                        </tr>
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-gray-900">{course.name}</div>
+                            {course.cricos_code && (
+                              <div className="text-xs text-gray-400 font-mono mt-0.5">{course.cricos_code}</div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-700">{course.university}</td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-1.5 text-sm text-gray-700">
+                              <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                              {course.city && course.state ? `${course.city}, ${course.state}` : course.city || course.state || '-'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-100 text-xs font-medium text-blue-700">
+                              {course.level || '-'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="font-semibold text-gray-900">{formatCurrency(course.tuition_fee)}</div>
+                            {course.currency && course.currency !== 'AUD' && (
+                              <div className="text-xs text-gray-400 mt-0.5">{course.currency}</div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm text-gray-700">
+                            {formatDuration(course.duration_months)}
+                          </td>
+                        </motion.tr>
                         
                         {/* Expanded Details */}
                         {expandedCourse === course.id && (
-                          <tr>
-                            <td colSpan="8" className="px-6 py-4 bg-gray-50">
-                              <table className="w-full text-sm">
-                                <thead>
-                                  <tr className="border-b border-gray-200">
-                                    <th className="pb-2 text-left font-semibold text-gray-700">Field</th>
-                                    <th className="pb-2 text-left font-semibold text-gray-700">Value</th>
-                                    <th className="pb-2 text-left font-semibold text-gray-700">Field</th>
-                                    <th className="pb-2 text-left font-semibold text-gray-700">Value</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                  <tr>
-                                    <td className="py-2 text-gray-600 font-medium">Course Name</td>
-                                    <td className="py-2 text-gray-900">{course.name || 'Not specified'}</td>
-                                    <td className="py-2 text-gray-600 font-medium">CRICOS Code</td>
-                                    <td className="py-2 font-mono text-gray-900">{course.cricos_code || 'Not specified'}</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-2 text-gray-600 font-medium">Institution</td>
-                                    <td className="py-2 text-gray-900">{course.university || 'Not specified'}</td>
-                                    <td className="py-2 text-gray-600 font-medium">Provider Code</td>
-                                    <td className="py-2 font-mono text-gray-900">{course.provider_code || 'Not specified'}</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-2 text-gray-600 font-medium">Course Level</td>
-                                    <td className="py-2 text-gray-900">{course.level || 'Not specified'}</td>
-                                    <td className="py-2 text-gray-600 font-medium">Institution Type</td>
-                                    <td className="py-2 text-gray-900">{course.institution_type || 'Not specified'}</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-2 text-gray-600 font-medium">Duration</td>
-                                    <td className="py-2 text-gray-900">{course.duration_months ? formatDuration(course.duration_months) : 'Not specified'}</td>
-                                    <td className="py-2 text-gray-600 font-medium">Total Students</td>
-                                    <td className="py-2 text-gray-900">{course.total_students ? course.total_students.toLocaleString() : 'Not specified'}</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-2 text-gray-600 font-medium">Tuition Fee</td>
-                                    <td className="py-2 text-gray-900">{course.tuition_fee ? formatCurrency(course.tuition_fee, course.currency) : 'Not specified'}</td>
-                                    <td className="py-2 text-gray-600 font-medium">Location</td>
-                                    <td className="py-2 text-gray-900">{course.city && course.state ? `${course.city}, ${course.state}` : course.city || course.state || 'Not specified'}</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-2 text-gray-600 font-medium">Subject</td>
-                                    <td className="py-2 text-gray-900">{course.subject || 'Not specified'}</td>
-                                    <td className="py-2 text-gray-600 font-medium">Postal Address</td>
-                                    <td className="py-2 text-gray-900">{course.postal_address || 'Not specified'}</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-2 text-gray-600 font-medium">Subject Category</td>
-                                    <td className="py-2 text-gray-900">{course.subject_category || 'Not specified'}</td>
-                                    <td className="py-2 text-gray-600 font-medium">Website</td>
-                                    <td className="py-2 text-gray-900">
-                                      {course.website ? (
-                                        <a href={course.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
-                                          {course.website}
-                                          <ExternalLink className="w-3 h-3" />
+                          <motion.tr
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                          >
+                            <td colSpan="7" className="px-6 pb-6 bg-gradient-to-b from-blue-50/50 to-white">
+                              <div className="pt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {/* Course Details */}
+                                <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
+                                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <BookOpen className="w-4 h-4" />
+                                    Course Details
+                                  </h4>
+                                  <div className="space-y-3 text-sm">
+                                    <div>
+                                      <div className="text-xs text-gray-400 mb-0.5">Course Name</div>
+                                      <div className="font-medium text-gray-900">{course.name || '-'}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-gray-400 mb-0.5">CRICOS Code</div>
+                                      <div className="font-mono text-gray-900">{course.cricos_code || '-'}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-gray-400 mb-0.5">Level</div>
+                                      <div className="text-gray-900">{course.level || '-'}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-gray-400 mb-0.5">Duration</div>
+                                      <div className="text-gray-900">{course.duration_months ? formatDuration(course.duration_months) : '-'}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-gray-400 mb-0.5">Tuition Fee</div>
+                                      <div className="font-semibold text-gray-900">{formatCurrency(course.tuition_fee)} {course.currency || 'AUD'}</div>
+                                    </div>
+                                    {course.subject && (
+                                      <div>
+                                        <div className="text-xs text-gray-400 mb-0.5">Subject</div>
+                                        <div className="text-gray-900">{course.subject}</div>
+                                      </div>
+                                    )}
+                                    {course.subject_category && (
+                                      <div>
+                                        <div className="text-xs text-gray-400 mb-0.5">Category</div>
+                                        <div className="text-gray-900">{course.subject_category}</div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Institution Details */}
+                                <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
+                                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <Building2 className="w-4 h-4" />
+                                    Institution
+                                  </h4>
+                                  <div className="space-y-3 text-sm">
+                                    <div>
+                                      <div className="text-xs text-gray-400 mb-0.5">Institution</div>
+                                      <div className="font-medium text-gray-900">{course.university || '-'}</div>
+                                    </div>
+                                    {course.provider_code && (
+                                      <div>
+                                        <div className="text-xs text-gray-400 mb-0.5">Provider Code</div>
+                                        <div className="font-mono text-gray-900">{course.provider_code}</div>
+                                      </div>
+                                    )}
+                                    {course.institution_type && (
+                                      <div>
+                                        <div className="text-xs text-gray-400 mb-0.5">Type</div>
+                                        <div className="text-gray-900">{course.institution_type}</div>
+                                      </div>
+                                    )}
+                                    <div>
+                                      <div className="text-xs text-gray-400 mb-0.5">Location</div>
+                                      <div className="text-gray-900">{course.city && course.state ? `${course.city}, ${course.state}` : course.city || course.state || '-'}</div>
+                                    </div>
+                                    {course.postal_address && (
+                                      <div>
+                                        <div className="text-xs text-gray-400 mb-0.5">Address</div>
+                                        <div className="text-gray-900 text-xs leading-relaxed">{course.postal_address}</div>
+                                      </div>
+                                    )}
+                                    {course.total_students && (
+                                      <div>
+                                        <div className="text-xs text-gray-400 mb-0.5">Students</div>
+                                        <div className="text-gray-900">{course.total_students.toLocaleString()}</div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Contact & Additional Info */}
+                                <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
+                                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <Globe className="w-4 h-4" />
+                                    Contact & Info
+                                  </h4>
+                                  <div className="space-y-3 text-sm">
+                                    {course.website && (
+                                      <div>
+                                        <div className="text-xs text-gray-400 mb-0.5">Website</div>
+                                        <a href={course.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 flex items-center gap-1.5 group">
+                                          <span className="truncate">{course.website}</span>
+                                          <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </a>
-                                      ) : 'Not specified'}
-                                    </td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-2 text-gray-600 font-medium">Status</td>
-                                    <td className="py-2 text-gray-900">{course.is_active !== undefined ? (course.is_active ? 'Active' : 'Inactive') : 'Not specified'}</td>
-                                    <td className="py-2 text-gray-600 font-medium">Phone</td>
-                                    <td className="py-2 text-gray-900">
-                                      {course.contact_phone ? (
-                                        <a href={`tel:${course.contact_phone}`} className="text-blue-600 hover:underline">{course.contact_phone}</a>
-                                      ) : 'Not specified'}
-                                    </td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-2 text-gray-600 font-medium">Last Verified</td>
-                                    <td className="py-2 text-gray-900">{course.last_verified ? new Date(course.last_verified).toLocaleDateString('en-AU') : 'Not verified'}</td>
-                                    <td className="py-2 text-gray-600 font-medium">Email</td>
-                                    <td className="py-2 text-gray-900">
-                                      {course.contact_email ? (
-                                        <a href={`mailto:${course.contact_email}`} className="text-blue-600 hover:underline">{course.contact_email}</a>
-                                      ) : 'Not specified'}
-                                    </td>
-                                  </tr>
-                                </tbody>
-                              </table>
+                                      </div>
+                                    )}
+                                    {course.contact_phone && (
+                                      <div>
+                                        <div className="text-xs text-gray-400 mb-0.5">Phone</div>
+                                        <a href={`tel:${course.contact_phone}`} className="text-blue-600 hover:text-blue-700 flex items-center gap-1.5">
+                                          <Phone className="w-3 h-3" />
+                                          {course.contact_phone}
+                                        </a>
+                                      </div>
+                                    )}
+                                    {course.contact_email && (
+                                      <div>
+                                        <div className="text-xs text-gray-400 mb-0.5">Email</div>
+                                        <a href={`mailto:${course.contact_email}`} className="text-blue-600 hover:text-blue-700 flex items-center gap-1.5">
+                                          <Mail className="w-3 h-3" />
+                                          {course.contact_email}
+                                        </a>
+                                      </div>
+                                    )}
+                                    {course.is_active !== undefined && (
+                                      <div>
+                                        <div className="text-xs text-gray-400 mb-0.5">Status</div>
+                                        <div className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${course.is_active ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                                          {course.is_active ? 'Active' : 'Inactive'}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {course.last_verified && (
+                                      <div>
+                                        <div className="text-xs text-gray-400 mb-0.5">Last Verified</div>
+                                        <div className="text-gray-900">{new Date(course.last_verified).toLocaleDateString('en-AU', { year: 'numeric', month: 'short', day: 'numeric' })}</div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
                             </td>
-                          </tr>
+                          </motion.tr>
                         )}
                       </React.Fragment>
                     ))}
@@ -268,65 +462,46 @@ export default function Cricos() {
               </div>
               
               {/* Pagination */}
-              <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-                <div className="text-sm text-gray-600">
-                  Showing {((page - 1) * pageSize) + 1}-{Math.min(page * pageSize, totalCount)} of {totalCount.toLocaleString()}
+              {totalPages > 1 && (
+                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Showing <span className="font-medium text-gray-900">{((page - 1) * pageSize) + 1}</span> to <span className="font-medium text-gray-900">{Math.min(page * pageSize, totalCount)}</span> of <span className="font-medium text-gray-900">{totalCount.toLocaleString()}</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <span className="px-3 py-2 text-sm text-gray-600">
+                      Page {page} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                  >
-                    Previous
-                  </button>
-                  <span className="px-3 py-1">Page {page} of {totalPages}</span>
-                  <button
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page >= totalPages}
-                    className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
+              )}
             </>
           )}
-        </div>
+        </motion.div>
 
-        {/* Pagination Footer */}
-        {!loading && data.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 px-6 py-4 flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              Showing <span className="font-medium text-gray-900">{((page - 1) * pageSize) + 1}</span> to <span className="font-medium text-gray-900">{Math.min(page * pageSize, totalCount)}</span> of <span className="font-medium text-gray-900">{totalCount.toLocaleString()}</span> courses
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="p-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <div className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-900">
-                Page {page} of {totalPages}
-              </div>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="p-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-      
-      {/* Footer */}
-      <div className="mt-6 text-center text-sm text-gray-600">
-        <p>Source: Australian Government - CRICOS (data.gov.au) | Updated: {new Date().toLocaleDateString('en-AU')}</p>
+        {/* Footer */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="mt-8 text-center text-xs text-gray-400"
+        >
+          <p>Source: Australian Government - CRICOS (data.gov.au) • Updated daily</p>
+        </motion.div>
       </div>
     </div>
   );
