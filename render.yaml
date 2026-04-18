@@ -3,7 +3,7 @@ services:
   - type: web
     name: scholar-radar-mcp
     env: python
-    buildCommand: cd frontend && npm install && npm run build && cd .. && pip install -r requirements.txt
+    buildCommand: echo "FORCE_REBUILD_20260418_212500" && cd frontend && rm -rf dist node_modules/.cache && npm install && npm run build && cd .. && pip install -r requirements.txt
     startCommand: uvicorn src.mcp_server.server:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
