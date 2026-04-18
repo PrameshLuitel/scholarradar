@@ -19,7 +19,7 @@ export default function Cricos() {
   const pageSize = 50;
 
   const states = ['All', 'NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
-  const levels = ['All', 'Undergraduate', 'Postgraduate', 'Vocational', 'Doctorate'];
+  const levels = ['All', 'Undergraduate', 'Postgraduate', 'Vocational', 'Doctorate', 'Bachelor', 'Master'];
 
   const fetchCricosData = async (currentPage, searchQuery) => {
     setLoading(true);
@@ -74,14 +74,6 @@ export default function Cricos() {
         
         {/* Header Section */}
         <div className="text-center max-w-3xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 text-blue-700 font-medium text-sm mb-6"
-          >
-            <Globe2 className="w-4 h-4" />
-            Official CRICOS Register
-          </motion.div>
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -217,9 +209,11 @@ export default function Cricos() {
                             {course.name}
                           </div>
                           <div className="text-xs text-gray-500 mt-1 flex items-center gap-1.5 opacity-80 group-hover:opacity-100">
-                            CRICOS: <code className="bg-gray-100 px-1.5 py-0.5 rounded font-mono border border-gray-200">{course.cricos_code || 'N/A'}</code>
+                            {course.cricos_code && (
+                              <span>CRICOS: <code className="bg-gray-100 px-1.5 py-0.5 rounded font-mono border border-gray-200">{course.cricos_code}</code></span>
+                            )}
                             {course.duration_months && (
-                              <span className="flex items-center gap-1 ml-2"><Clock className="w-3 h-3"/> {course.duration_months} mo</span>
+                              <span className="flex items-center gap-1 ml-2"><Clock className="w-3 h-3"/> {course.duration_months} months</span>
                             )}
                           </div>
                         </td>
@@ -228,7 +222,9 @@ export default function Cricos() {
                             <Building2 className="w-4 h-4 text-gray-400 shrink-0" />
                             <span className="font-medium text-gray-800 line-clamp-1">{course.university}</span>
                           </div>
-                          <div className="text-xs text-gray-500 mt-1">Provider: {course.provider_code || 'N/A'}</div>
+                          {course.provider_code && (
+                            <div className="text-xs text-gray-500 mt-1">Provider: {course.provider_code}</div>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-1.5 text-sm">
@@ -246,13 +242,12 @@ export default function Cricos() {
                           {course.tuition_fee ? (
                             <div className="flex flex-col items-end">
                               <span className="font-semibold text-gray-900 flex items-center gap-1">
-                                {course.currency || 'AUD'} <DollarSign className="w-3 h-3 text-emerald-500 -mr-1" />
-                                {course.tuition_fee.toLocaleString()}
+                                {course.currency || 'AUD'} {course.tuition_fee.toLocaleString()}
                               </span>
                               <span className="text-xs text-gray-500">per year</span>
                             </div>
                           ) : (
-                            <span className="text-gray-400 text-sm italic">N/A</span>
+                            <span className="text-gray-400 text-sm italic">Not specified</span>
                           )}
                         </td>
                       </motion.tr>

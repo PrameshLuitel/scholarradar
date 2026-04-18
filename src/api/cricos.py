@@ -52,9 +52,8 @@ If a field is not mentioned, exclude it. Return ONLY valid JSON."""
                 log.warning("cricos_ai_parse_failed", error=str(e), query=req.query)
         
         # 2. Build Supabase Query
-        # We target the 'courses' table where 'cricos_code' is not null (has some character).
-        query_builder = db.table("courses").select("*", count="exact")
-        query_builder = query_builder.ilike("cricos_code", "%_%") # Effectively ensures it is not null / not empty
+        # Target Australian courses (CRICOS data)
+        query_builder = db.table("courses").select("*", count="exact").eq("country", "australia")
         
         # Apply combined filters (Explicit UI filters take precedence over AI filters)
         state_filter = req.state or parsed_filters.get("state")
@@ -69,6 +68,10 @@ If a field is not mentioned, exclude it. Return ONLY valid JSON."""
                 query_builder = query_builder.ilike("level", "%undergrad%")
             elif any(k in lvl for k in ('postgrad', 'master', 'mba')):
                 query_builder = query_builder.or_("level.ilike.%postgrad%,level.ilike.%master%")
+            elif 'vocational' in lvl or 'vET' in lvl or 'diploma' in lvl or 'certificate' in lvl:
+                query_builder = query_builder.ilike("level", "%vocational%")
+            elif 'doctorate' in lvl or 'phd' in lvl:
+                query_builder = query_builder.ilike("level", "%doctorate%")
             else:
                 query_builder = query_builder.ilike("level", f"%{level_filter}%")
                 
