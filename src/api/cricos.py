@@ -71,9 +71,12 @@ async def search_cricos(req: CricosSearchRequest):
             # Level extraction
             if any(x in query_lower for x in ['bachelor', 'undergrad', 'b.a', 'b.s']):
                 parsed_filters['level'] = 'bachelor'
-            elif any(x in query_lower for x in ['postgrad', 'mba', 'msba']):
+            elif any(x in query_lower for x in ['postgrad', 'postgraduate']):
                 parsed_filters['level'] = 'master'
-            elif 'master' in query_lower or ' ms ' in query_lower or query_lower.endswith(' ms') or 'ma ' in query_lower or ' msc' in query_lower or query_lower.endswith(' msc'):
+            elif 'mba' in query_lower or 'msba' in query_lower:
+                # MBA/MSBA are master's degrees, but don't set level here - let keyword handle it
+                pass
+            elif 'master' in query_lower or query_lower.endswith(' ms') or 'ma ' in query_lower or ' msc' in query_lower or query_lower.endswith(' msc'):
                 parsed_filters['level'] = 'master'
             elif any(x in query_lower for x in ['phd', 'doctorate', 'doctor of', 'ph.d']):
                 parsed_filters['level'] = 'doctorate'
@@ -132,7 +135,7 @@ async def search_cricos(req: CricosSearchRequest):
                 'sydney', 'melbourne', 'brisbane', 'perth', 'adelaide', 'hobart', 'canberra', 'darwin',
                 'nsw', 'vic', 'qld', 'wa', 'sa', 'tas', 'act', 'nt',
                 'bachelor', 'master', 'phd', 'doctorate', 'diploma', 'certificate',
-                'mba', 'msba', 'ms', 'ma', 'msc', 'undergrad', 'postgrad',
+                'undergrad', 'postgrad', 'postgraduate',
                 'months', 'month', 'years', 'year', 'yrs', 'yr',
                 'university', 'uni', 'college', 'institute',
                 'monash', 'unsw', 'uts', 'rmit', 'deakin', 'qut', 'uq', 'usyd', 'unimelb', 'anu',
@@ -157,6 +160,13 @@ IMPORTANT: Fix typos and misspellings automatically!
 - "busines" → "business", "computr" → "computer"
 - ANY misspelled field of study should be corrected to the proper term
 
+CRITICAL RULES FOR DEGREE TYPES:
+- "MBA" or "mba" → keyword: "MBA business administration" (KEEP "MBA" in keyword!)
+- "MSBA" or "msba" → keyword: "MSBA business analytics" (KEEP "MSBA" in keyword!)
+- "MSC" or "msc" → keyword: "MSc science" 
+- "MA" or "ma" → keyword: "MA arts"
+- DO NOT remove MBA, MSBA, MSC, MA from keyword - they are important search terms!
+
 Available fields:
 - state: NSW, VIC, QLD, WA, SA, TAS, ACT, NT (sydney→NSW, melbourne→VIC, brisbane→QLD, perth→WA, adelaide→SA, hobart→TAS, canberra→ACT, darwin→NT)
 - level: bachelor, master, doctorate, diploma, certificate, vocational (undergraduate→bachelor, postgraduate→master, phd/doctor→doctorate)
@@ -164,23 +174,28 @@ Available fields:
 - min_duration: number in months (at least 2 years→24)
 - max_duration: number in months (up to 3 years→36)
 - university: institution name (Monash, UNSW, University of Sydney, Bond, etc.)
-- keyword: subject/field/course type (business analytics, computer science, nursing, engineering, MBA, IT, data science, AI, psychology)
+- keyword: subject/field/course type (MBA, MSBA, business analytics, computer science, nursing, engineering, IT, data science, AI, psychology)
 
 Rules:
 1. ALWAYS fix typos/misspellings in the query before extracting
 2. Extract EVERYTHING mentioned - be thorough
-3. Map abbreviations: MSBA→business analytics, MBA→business administration, IT→information technology, CS→computer science, AI→artificial intelligence, ML→machine learning, DS→data science
-4. Handle "OR" queries: "data science or engineering" → keyword:"data science engineering"
-5. Infer implicit filters: "sydney uni"→university:"University of Sydney", "melb uni"→university:"University of Melbourne"
-6. For field of study, use the most specific term: "business analytics" not just "business"
-7. Return ONLY valid JSON
+3. KEEP degree abbreviations (MBA, MSBA, MSC, MA, BBA, etc.) in the keyword field - they are critical for search!
+4. Map abbreviations: MSBA→"MSBA business analytics", MBA→"MBA business administration", IT→"IT information technology"
+5. Handle "OR" queries: "data science or engineering" → keyword:"data science engineering"
+6. Infer implicit filters: "sydney uni"→university:"University of Sydney", "melb uni"→university:"University of Melbourne"
+7. For field of study, use the most specific term: "business analytics" not just "business"
+8. Return ONLY valid JSON
 
 Examples:
-- "msba in sydney under 50k" → {"keyword": "business analytics", "state": "NSW", "max_fee": 50000, "level": "master"}
+- "msba" → {"keyword": "MSBA business analytics"}
+- "msba in sydney" → {"keyword": "MSBA business analytics", "state": "NSW"}
+- "msba in sydney under 50k" → {"keyword": "MSBA business analytics", "state": "NSW", "max_fee": 50000, "level": "master"}
+- "mba" → {"keyword": "MBA business administration"}
+- "mba in sydney" → {"keyword": "MBA business administration", "state": "NSW"}
 - "phd computer science monash" → {"level": "doctorate", "keyword": "computer science", "university": "Monash"}
 - "I want to study nursing in brisbane" → {"keyword": "nursing", "state": "QLD"}
 - "cheap engineering courses in melbourne" → {"keyword": "engineering", "state": "VIC", "max_fee": 30000}
-- "MBA at UNSW" → {"keyword": "business administration", "university": "UNSW", "level": "master"}
+- "MBA at UNSW" → {"keyword": "MBA business administration", "university": "UNSW", "level": "master"}
 - "data science or AI masters" → {"keyword": "data science artificial intelligence", "level": "master"}
 - "DATA SCEINCE OR engineering" → {"keyword": "data science engineering"} (typo fixed)
 - "computr sceince masters" → {"keyword": "computer science", "level": "master"} (typos fixed)
@@ -276,18 +291,18 @@ Examples:
         if keyword:
             # Expand keyword with common abbreviations/synonyms
             keyword_expansions = {
-                'msba': 'business analytics',
-                'mba': 'business administration',
-                'msc': 'science',
-                'ma': 'arts',
-                'bba': 'business administration',
-                'bs': 'science',
-                'ba': 'arts',
-                'it': 'information technology',
-                'cs': 'computer science',
-                'ai': 'artificial intelligence',
-                'ml': 'machine learning',
-                'ds': 'data science',
+                'msba': 'MSBA business analytics',
+                'mba': 'MBA business administration',
+                'msc': 'MSc science',
+                'ma': 'MA arts',
+                'bba': 'BBA business administration',
+                'bs': 'BSc science',
+                'ba': 'BA arts',
+                'it': 'IT information technology',
+                'cs': 'CS computer science',
+                'ai': 'AI artificial intelligence',
+                'ml': 'ML machine learning',
+                'ds': 'DS data science',
                 'biz': 'business',
                 'eng': 'engineering',
                 'psy': 'psychology',
@@ -308,7 +323,7 @@ Examples:
             
             # Add expansions if keyword matches abbreviation
             for abbrev, full in keyword_expansions.items():
-                if abbrev in keyword_lower:
+                if abbrev in keyword_lower or keyword_lower in abbrev:
                     search_terms.append(full)
                     break
             
@@ -334,6 +349,9 @@ Examples:
             for term in search_terms:
                 or_conditions.append(f"name.ilike.%{term}%")
                 or_conditions.append(f"subject.ilike.%{term}%")
+                # Also search in level for degree types like MBA, MSBA
+                if len(term) <= 10:  # Short terms like MBA, MSBA
+                    or_conditions.append(f"level.ilike.%{term}%")
             
             query_builder = query_builder.or_(",".join(or_conditions))
         
